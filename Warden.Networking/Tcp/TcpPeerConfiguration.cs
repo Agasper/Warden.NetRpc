@@ -23,21 +23,21 @@ namespace Warden.Networking.Tcp
 
         //internal SynchronizationContext SyncronizationContext => syncronizationContext;
 
-        int bufferSize;
-        bool noDelay;
-        MemoryStreamPool memoryStreamPool;
-        LingerOption lingerOption;
-        ILogManager logManager;
-        bool keepAliveEnabled;
-        int keepAliveInterval;
-        int keepAliveTimeout;
-        bool reuseAddress;
+        protected int bufferSize;
+        protected bool noDelay;
+        protected MemoryStreamPool memoryStreamPool;
+        protected LingerOption lingerOption;
+        protected ILogManager logManager;
+        protected bool keepAliveEnabled;
+        protected int keepAliveInterval;
+        protected int keepAliveTimeout;
+        protected bool reuseAddress;
 
-        ConnectionSimulation connectionSimulation;
-        SynchronizationContext syncronizationContext;
-        ContextSynchronizationMode contextSynchronizationMode;
+        protected ConnectionSimulation connectionSimulation;
+        protected SynchronizationContext syncronizationContext;
+        protected ContextSynchronizationMode contextSynchronizationMode;
 
-        private protected bool locked;
+        protected bool locked;
 
         internal void Lock()
         {
@@ -56,7 +56,7 @@ namespace Warden.Networking.Tcp
                 throw new ArgumentNullException(nameof(value));
         }
 
-        public void CaptureSynchronizationContext()
+        public virtual void CaptureSynchronizationContext()
         {
             CheckLocked();
             if (SynchronizationContext.Current == null)
@@ -64,7 +64,7 @@ namespace Warden.Networking.Tcp
             this.syncronizationContext = SynchronizationContext.Current;
         }
 
-        public void SetSynchronizationContext(SynchronizationContext context)
+        public virtual void SetSynchronizationContext(SynchronizationContext context)
         {
             CheckLocked();
             if (context == null)

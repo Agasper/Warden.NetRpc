@@ -7,9 +7,9 @@ namespace Warden.Networking.Tcp
         public int ListenBacklog { get => listenBackLog; set { CheckLocked(); listenBackLog = value; } }
         public int AcceptThreads { get => acceptThreads; set { CheckLocked(); acceptThreads = value; } }
 
-        int acceptThreads;
-        int listenBackLog;
-        int maximumConnections;
+        protected int acceptThreads;
+        protected int listenBackLog;
+        protected int maximumConnections;
 
         public TcpServerConfiguration()
         {

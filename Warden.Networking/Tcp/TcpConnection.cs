@@ -21,10 +21,17 @@ namespace Warden.Networking.Tcp
         {
             get
             {
-                var socket_ = this.socket;
-                if (socket_ == null)
+                try
+                {
+                    var socket_ = this.socket;
+                    if (socket_ == null)
+                        return null;
+                    return socket_.RemoteEndPoint;
+                }
+                catch(SocketException)
+                {
                     return null;
-                return socket_.RemoteEndPoint;
+                }
             }
         }
         public bool Connected

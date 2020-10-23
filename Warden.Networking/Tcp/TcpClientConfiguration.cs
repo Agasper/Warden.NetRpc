@@ -7,9 +7,9 @@ namespace Warden.Networking.Tcp
         public bool AutoReconnect { get => autoReconnect; set { CheckLocked(); autoReconnect = value; } }
         public int AutoReconnectDelay { get => autoReconnectDelay; set { CheckLocked(); autoReconnectDelay = value; } }
 
-        int connectTimeout;
-        bool autoReconnect;
-        int autoReconnectDelay;
+        protected int connectTimeout;
+        protected bool autoReconnect;
+        protected int autoReconnectDelay;
 
         public TcpClientConfiguration()
         {
