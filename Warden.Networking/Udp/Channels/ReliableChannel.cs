@@ -164,8 +164,8 @@ namespace Warden.Networking.Udp.Channels
                 if (relate == 0) 
                 {
                     //right in time
-                    AdvanceWindow();
                     connection.ReleaseDatagram(datagram);
+                    AdvanceWindow();
 
                     int nextSeqNr = (datagram.Sequence + 1) % MAX_SEQUENCE;
 

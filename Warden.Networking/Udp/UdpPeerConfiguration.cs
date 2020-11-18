@@ -26,7 +26,6 @@ namespace Warden.Networking.Udp
         public int PingInterval { get => pingInterval; set { CheckLocked(); pingInterval = value; } }
         public int ConnectionLingerTimeout { get => connectionLingerTimeout; set { CheckLocked(); connectionLingerTimeout = value; } }
         public TooLargeMessageBehaviour TooLargeUnreliableMessageBehaviour { get => tooLargeMessageBehaviour; set { CheckLocked(); tooLargeMessageBehaviour = value; } }
-        public ContextSynchronizationMode ContextSynchronizationMode { get => contextSynchronizationMode; set { CheckLocked(); contextSynchronizationMode = value; } }
 
         //internal SynchronizationContext SyncronizationContext => syncronizationContext;
 
@@ -42,7 +41,6 @@ namespace Warden.Networking.Udp
         int pingInterval;
         ConnectionSimulation connectionSimulation;
         TooLargeMessageBehaviour tooLargeMessageBehaviour;
-        ContextSynchronizationMode contextSynchronizationMode;
         private protected bool autoMtuExpand;
 
         SynchronizationContext syncronizationContext;
@@ -84,7 +82,7 @@ namespace Warden.Networking.Udp
 
         internal void SynchronizeSafe(Action callback, ILogger logger)
         {
-            ContextSynchronizationHelper.SynchronizeSafe(this.syncronizationContext, this.contextSynchronizationMode,
+            ContextSynchronizationHelper.SynchronizeSafe(this.syncronizationContext,
                 callback, logger);
         }
 

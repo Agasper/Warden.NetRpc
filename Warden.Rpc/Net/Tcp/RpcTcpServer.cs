@@ -7,14 +7,15 @@ using Warden.Rpc.Net.Tcp.Events;
 
 namespace Warden.Rpc.Net.Tcp
 {
-    //public delegate void DOnSessionClosed(SessionClosedEventArgs<T> args);
-    //public delegate void DOnSessionOpened(SessionOpenedEventArgs<T> args);
+    //public delegate void DOnSessionClosed(SessionClosedEventArgs args);
+    //public delegate void DOnSessionOpened(SessionOpenedEventArgs args);
 
     //public abstract class RpcTcpServer
     //{
-    //    class InnerTcpServer : TcpServer
+    //    internal class InnerTcpServer : TcpServer
     //    {
-
+    //        public InnerTcpServer(TcpServerConfiguration tcpServerConfiguration) : base(tcpServerConfiguration)
+    //        { }
     //    }
 
     //    public event DOnSessionClosed OnSessionClosedEvent;

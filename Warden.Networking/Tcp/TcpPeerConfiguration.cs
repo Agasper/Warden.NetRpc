@@ -15,7 +15,6 @@ namespace Warden.Networking.Tcp
         public MemoryStreamPool MemoryStreamPool { get => memoryStreamPool; set { CheckLocked(); CheckNull(value); memoryStreamPool = value; } }
         public int BufferSize { get => bufferSize; set { CheckLocked(); bufferSize = value; } }
         public ILogManager LogManager { get => logManager; set { CheckLocked(); CheckNull(value); logManager = value; } }
-        public ContextSynchronizationMode ContextSynchronizationMode { get => contextSynchronizationMode; set { CheckLocked(); contextSynchronizationMode = value; } }
 
         public bool KeepAliveEnabled { get => keepAliveEnabled; set { CheckLocked(); keepAliveEnabled = value; } }
         public int KeepAliveInterval { get => keepAliveInterval; set { CheckLocked(); keepAliveInterval = value; } }
@@ -35,7 +34,6 @@ namespace Warden.Networking.Tcp
 
         protected ConnectionSimulation connectionSimulation;
         protected SynchronizationContext syncronizationContext;
-        protected ContextSynchronizationMode contextSynchronizationMode;
 
         protected bool locked;
 
@@ -74,7 +72,7 @@ namespace Warden.Networking.Tcp
 
         internal void SynchronizeSafe(Action callback, ILogger logger)
         {
-            ContextSynchronizationHelper.SynchronizeSafe(this.syncronizationContext, this.contextSynchronizationMode,
+            ContextSynchronizationHelper.SynchronizeSafe(this.syncronizationContext,
                 callback, logger);
         }
 

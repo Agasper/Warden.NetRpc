@@ -166,9 +166,9 @@ namespace Warden.Networking.Tcp
 
         internal override void OnConnectionClosedInternal(TcpConnection tcpConnection)
         {
+            base.OnConnectionClosedInternal(tcpConnection);
             ChangeStatus(TcpConnectionStatus.Disconnected);
             Connection = null;
-            base.OnConnectionClosedInternal(tcpConnection);
             tcpConnection.Dispose();
         }
 

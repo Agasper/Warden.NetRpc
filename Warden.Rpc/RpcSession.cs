@@ -14,6 +14,7 @@ namespace Warden.Rpc
     public abstract class RpcSession : IRpcSession
     {
         public object Tag { get; set; }
+        protected bool IsClosed => closed;
 
         readonly ConcurrentDictionary<uint, RemotingRequest> requests;
         readonly IRpcConnection connection;
@@ -255,7 +256,7 @@ namespace Warden.Rpc
 
         async Task ProcessLocalExecutionExceptionInternal(RemotingRequest remotingRequest, RemotingException exception)
         {
-            logger.Error($"{this} got an unhandled exception on method execution {remotingRequest.MethodKey}: {exception}");
+            //logger.Error($"{this} got an unhandled exception on method execution {remotingRequest.MethodKey}: {exception}");
 
             RemotingResponseError remotingResponseError = new RemotingResponseError(
                     remotingRequest.RequestId,

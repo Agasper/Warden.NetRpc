@@ -4,26 +4,28 @@ using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
 using Warden.Networking.Tcp.Messages;
 using Warden.Rpc;
+//using static Warden.Rpc.Net.Tcp.RpcTcpServer;
 
 namespace Warden.Rpc.Net.Tcp
 {
-    //public class RpcTcpConnection<T> : TcpConnection, IRpcConnection
+    //public class RpcTcpConnection : TcpConnection, IRpcConnection
     //{
-    //    public T Object => obj;
-
-    //    T obj;
     //    RpcTcpSession session;
     //    RpcSerializer serializer;
+    //    RpcTcpServerConfiguration configuration;
 
-    //    public RpcTcpConnection(RpcTcpServer<T> parent) : base(parent)
+    //    internal RpcTcpConnection(InnerTcpServer parent, RpcTcpServerConfiguration configuration) : base(parent)
     //    {
+    //        this.configuration = configuration;
+
     //        RpcConfiguration rpcConfiguration = new RpcConfiguration();
     //        rpcConfiguration.Connection = this;
-    //        rpcConfiguration.DefaultExecutionTimeout = parent.Configuration.DefaultExecutionTimeout;
-    //        rpcConfiguration.OrderedExecution = false;
-    //        rpcConfiguration.Serializer = parent.Configuration.Serializer;
-    //        serializer = parent.Configuration.Serializer;
-    //        obj = parent.CreateSessionInternal();
+    //        rpcConfiguration.DefaultExecutionTimeout = configuration.DefaultExecutionTimeout;
+    //        rpcConfiguration.OrderedExecution = configuration.OrderedExecution;
+    //        rpcConfiguration.OrderedExecutionMaxQueue = configuration.OrderedExecutionMaxQueue;
+    //        rpcConfiguration.Serializer = configuration.Serializer;
+    //        serializer = configuration.Serializer;
+    //        var obj = configuration.SessionFactory.CreateSession(this);
     //        session = new RpcTcpSession(obj, rpcConfiguration);
     //    }
 

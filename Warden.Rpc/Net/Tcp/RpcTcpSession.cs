@@ -5,8 +5,11 @@ namespace Warden.Rpc.Net.Tcp
 {
     public class RpcTcpSession : RpcSession
     {
-        RemotingObjectScheme remotingObjectScheme;
+        public object Object => obj;
+
         readonly object obj;
+
+        RemotingObjectScheme remotingObjectScheme;
 
         public RpcTcpSession(object obj, RpcConfiguration configuration) : base(configuration)
         {

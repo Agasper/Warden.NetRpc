@@ -8,9 +8,11 @@ namespace Warden.Rpc.Net.Tcp
 {
     public class RpcTcpServerConfiguration : TcpServerConfiguration
     {
+        public ISessionFactory SessionFactory { get => sessionFactory; set { CheckLocked(); CheckNull(value); sessionFactory = value; } }
         public RpcSerializer Serializer { get => serializer; set { CheckLocked(); CheckNull(value); serializer = value; } }
-        public int DefaultExecutionTimeout { get => defaultExecutionTimeout; set { CheckLocked(); defaultExecutionTimeout = value; } }
+        //TODO FIX remove this class or refactor
         public RemotingObjectConfiguration RemotingConfiguration { get => remotingConfiguration; set { CheckLocked(); remotingConfiguration = value; } }
+        public int DefaultExecutionTimeout { get => defaultExecutionTimeout; set { CheckLocked(); defaultExecutionTimeout = value; } }
         public bool OrderedExecution { get => orderedExecution; set { CheckLocked(); orderedExecution = value; } }
         public int OrderedExecutionMaxQueue { get => orderedExecutionMaxQueue; set { CheckLocked(); orderedExecutionMaxQueue = value; } }
 
@@ -21,6 +23,7 @@ namespace Warden.Rpc.Net.Tcp
         RemotingObjectConfiguration remotingConfiguration;
         bool orderedExecution;
         int orderedExecutionMaxQueue;
+        ISessionFactory sessionFactory;
         TaskScheduler taskScheduler;
 
         public override void CaptureSynchronizationContext()

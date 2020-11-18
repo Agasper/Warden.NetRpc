@@ -28,7 +28,7 @@ namespace Warden.Networking.Tcp
                         return null;
                     return socket_.RemoteEndPoint;
                 }
-                catch(SocketException)
+                catch
                 {
                     return null;
                 }
@@ -341,6 +341,12 @@ namespace Warden.Networking.Tcp
             }
             catch (ObjectDisposedException)
             { }
+            catch (SocketException sex)
+            {
+                if (sex.SocketErrorCode != SocketError.ConnectionReset)
+                    logger.Error($"{this} broken due to exception: {sex}");
+                Close();
+            }
             catch (Exception ex)
             {
                 logger.Error($"{this} broken due to exception: {ex}");

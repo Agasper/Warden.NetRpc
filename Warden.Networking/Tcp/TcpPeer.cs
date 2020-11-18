@@ -119,10 +119,12 @@ namespace Warden.Networking.Tcp
                 {
                     Logger.Error($"Unhandled exception on {args.Connection.GetType().Name}.{nameof(OnConnectionClosedEvent)}: {ex}");
                 }
-            }, this.Logger );
 
-            if (!tcpConnection.Stashed && !tcpConnection.Disposed)
-                tcpConnection.Dispose();
+                if (!tcpConnection.Stashed && !tcpConnection.Disposed)
+                    tcpConnection.Dispose();
+
+
+            }, this.Logger );
         }
 
         internal void OnConnectionOpenedInternal(TcpConnection tcpConnection)

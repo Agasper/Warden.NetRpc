@@ -27,6 +27,7 @@ namespace Warden.Networking.Udp.Channels
         public override void OnDatagram(Datagram datagram)
         {
             CheckDatagramValid(datagram);
+            connection.ReleaseDatagram(datagram);
             lock (sequenceInMutex)
             {
                 int relate = RelativeSequenceNumber(datagram.Sequence, lastSequenceIn + 1);
@@ -38,7 +39,6 @@ namespace Warden.Networking.Udp.Channels
                 }
                 lastSequenceIn = datagram.Sequence;
             }
-            connection.ReleaseDatagram(datagram);
         }
     }
 }
