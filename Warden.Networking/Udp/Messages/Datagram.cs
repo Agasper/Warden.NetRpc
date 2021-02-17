@@ -112,6 +112,8 @@ namespace Warden.Networking.Udp.Messages
 
         public int GetTotalSize()
         {
+            if (IsDisposed)
+                return 0;
             int size = GetHeaderSize();
             if (stream != null)
                 size += (int)stream.Length;
@@ -207,7 +209,7 @@ namespace Warden.Networking.Udp.Messages
             if (IsFragmented)
                 fragInfo = $"{FragmentationInfo.Frame}/{FragmentationInfo.Frames}(g{FragmentationInfo.FragmentationGroupId})";
             string len = $"0 ({GetTotalSize()})";
-            if (stream != null)
+            if (stream != null && !IsDisposed)
                 len = $"{stream.Length} ({GetTotalSize()})";
             return $"{nameof(Datagram)}[type={Type},connKey={ConnectionKey},dtype={DeliveryType},channel={Channel},seq={Sequence},len={len},frag={fragInfo}]";
         }

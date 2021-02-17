@@ -124,8 +124,8 @@ namespace Warden.Networking.Udp
             var oldStatus = this.Status;
             if (oldStatus != status)
             {
-                this.logger.Info($"{this} status changed to {status}");
                 this.Status = status;
+                this.logger.Info($"{this} status changed to {status}");
                 this.lastStatusChange = DateTime.UtcNow;
                 UpdateTimeoutDeadline();
 
@@ -492,6 +492,8 @@ namespace Warden.Networking.Udp
             if (Status == UdpConnectionStatus.Disconnected)
                 return;
             ChangeStatus(UdpConnectionStatus.Disconnected);
+
+            logger.Trace($"{this} closing with ({reason})");
             var disconnectReq_ = disconnectReq;
             if (disconnectReq_ != null)
             {
@@ -499,8 +501,11 @@ namespace Warden.Networking.Udp
                 disconnectReq = null;
             }
             var args = new ConnectionClosedEventArgs(this, reason, payload);
+            logger.Trace($"{this} closing pre event syncronization");
             peer.Configuration.SynchronizeSafe(() =>
             {
+                logger.Trace($"{this} firing event connection OnConnectionClosed");
+
                 try
                 {
                     OnConnectionClosed(args);
@@ -510,8 +515,12 @@ namespace Warden.Networking.Udp
                     logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnConnectionClosed)}: {ex}");
                 }
 
+                logger.Trace($"{this} firing event peer OnConnectionClosed");
                 peer.OnConnectionClosedInternalSynchronized(args);
+                logger.Trace($"{this} events fired");
             }, logger);
+
+            logger.Trace($"{this} closing post event syncronization");
 
             var connectTcs_ = this.connectTcs;
             if (connectTcs_ != null)

@@ -171,7 +171,7 @@ namespace Warden.Networking.Udp
         public virtual void Shutdown()
         {
             this.socketArgsPool.Clear(true);
-            this.poller.StopPolling(true);
+            this.poller.StopPolling(false);
             DestroySocket();
         }
 
@@ -208,24 +208,26 @@ namespace Warden.Networking.Udp
 
         private protected virtual void PollEventsInternal()
         {
-            for (int i = 0; i < latencySimulationRecvBag.Count; i++)
-            {
-                if (latencySimulationRecvBag.TryDequeue(out DelayedDatagram d))
-                {
-                    if (DateTime.UtcNow > d.releaseTimestamp)
-                        ActuallyOnDatagram(d.datagram, d.endpoint);
-                    else
-                        latencySimulationRecvBag.Enqueue(d);
-                }
-            }
-
             try
             {
+
+                for (int i = 0; i < latencySimulationRecvBag.Count; i++)
+                {
+                    if (latencySimulationRecvBag.TryDequeue(out DelayedDatagram d))
+                    {
+                        if (DateTime.UtcNow > d.releaseTimestamp)
+                            ActuallyOnDatagram(d.datagram, d.endpoint);
+                        else
+                            latencySimulationRecvBag.Enqueue(d);
+                    }
+                }
+
                 PollEvents();
+
             }
             catch (Exception ex)
             {
-                Logger.Error($"Exception in {this.GetType().Name}.{nameof(PollEvents)}: {ex}");
+                Logger.Error($"Unhandled exception: {ex}");
                 this.Shutdown();
             }
         }

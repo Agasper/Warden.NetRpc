@@ -56,7 +56,7 @@ namespace Warden.Networking.Udp
             UpdateTimeoutDeadline();
             this.latency = latency;
             if (avgLatency.HasValue)
-                avgLatency = (int)((avgLatency * 0.7) + (latency * 0.3));
+                avgLatency = (avgLatency * 0.7f) + (latency * 0.3f);
             else
                 avgLatency = latency;
 

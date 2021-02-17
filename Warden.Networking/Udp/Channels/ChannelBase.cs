@@ -17,8 +17,8 @@ namespace Warden.Networking.Udp.Channels
 
         protected int lastSequenceIn = -1;
         protected int lastSequenceOut = 0;
-        readonly protected object sequenceInMutex = new object();
-        readonly protected object sequenceOutMutex = new object();
+
+        readonly protected object channelMutex = new object();
 
 
         public ChannelBase(MemoryStreamPool memoryStreamPool, ILogManager logManager,
@@ -59,7 +59,7 @@ namespace Warden.Networking.Udp.Channels
         protected virtual ushort GetNextSequenceOut()
         {
             ushort newSequence = 0;
-            lock (sequenceOutMutex)
+            lock (channelMutex)
             {
                 newSequence = (ushort)lastSequenceOut;
                 lastSequenceOut = (ushort)((lastSequenceOut + 1) % MAX_SEQUENCE);

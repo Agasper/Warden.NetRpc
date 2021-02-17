@@ -28,7 +28,7 @@ namespace Warden.Networking.Udp.Channels
         {
             CheckDatagramValid(datagram);
             connection.ReleaseDatagram(datagram);
-            lock (sequenceInMutex)
+            lock (channelMutex)
             {
                 int relate = RelativeSequenceNumber(datagram.Sequence, lastSequenceIn + 1);
                 if (relate < 0)

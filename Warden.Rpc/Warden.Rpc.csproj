@@ -12,6 +12,15 @@
     <Reference Include="Google.Protobuf">
       <HintPath>..\Libs\Protobuf3.12.x\Google.Protobuf.dll</HintPath>
     </Reference>
+    <Reference Include="Google.Protobuf">
+      <HintPath>..\..\..\Warden\LibraryPod\Libs\Protobuf3.13.0\Google.Protobuf.dll</HintPath>
+    </Reference>
+    <Reference Include="Google.Protobuf">
+      <HintPath>..\..\..\Warden\LibraryPod\Libs\Protobuf3.13.0\netstandard2.0\Google.Protobuf.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Memory">
+      <HintPath>..\Libs\System.Memory.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Payload\" />
@@ -24,6 +33,6 @@
     <None Remove="SN\SN.snk" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Google.Protobuf" Version="3.13.0" />
+    <PackageReference Include="System.Buffers" Version="4.5.1" />
   </ItemGroup>
 </Project>

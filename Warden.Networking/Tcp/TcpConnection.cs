@@ -504,16 +504,16 @@ namespace Warden.Networking.Tcp
 
         public Task FlushSendQueueAsync()
         {
-            if (closing)
-                throw new InvalidOperationException($"Connection is closing");
+            //if (closing)
+            //    throw new InvalidOperationException($"Connection is closed");
 
             return sendTask;
         }
 
         public Task FlushSendQueueAndCloseAsync()
         {
-            if (closing)
-                throw new InvalidOperationException($"Connection is closing");
+            //if (closing)
+            //    throw new InvalidOperationException($"Connection is closed");
 
             lock(sendMutex)
                 sendTask = sendTask.ContinueWith((t) => Close(), this.CancellationToken);

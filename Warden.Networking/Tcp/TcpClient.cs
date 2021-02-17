@@ -28,21 +28,19 @@ namespace Warden.Networking.Tcp
         }
 
         private protected override ILogger Logger => logger;
-        protected bool userCanReconnect;
 
         new TcpClientConfiguration configuration;
         TcpConnectionStatus status;
         long connectionId;
         Socket clientSocket;
         ILogger logger;
-
-        DateTime lastDisconnectedStatus;
         bool canReconnect;
+
+        DateTime reconnectTimerStartFrom;
         IPEndPoint lastEndpoint;
 
         public TcpClient(TcpClientConfiguration configuration) : base(configuration)
         {
-            this.userCanReconnect = true;
             this.configuration = configuration;
             this.logger = configuration.LogManager.GetLogger(nameof(TcpClient));
             this.logger.Meta.Add("kind", this.GetType().Name);
@@ -54,12 +52,13 @@ namespace Warden.Networking.Tcp
             if (status == newStatus)
                 return;
 
+
+            if (newStatus == TcpConnectionStatus.Disconnected)
+                reconnectTimerStartFrom = DateTime.UtcNow;
+
             status = newStatus;
 
             logger.Info($"{nameof(TcpClient)} status changed to {newStatus}");
-
-            if (newStatus == TcpConnectionStatus.Disconnected)
-                lastDisconnectedStatus = DateTime.UtcNow;
 
             configuration.SynchronizeSafe(() => {
                 ClientStatusChangedEventArgs args = new ClientStatusChangedEventArgs(newStatus);
@@ -88,21 +87,31 @@ namespace Warden.Networking.Tcp
             Connection?.PollEventsInternal();
 
             if (status == TcpConnectionStatus.Disconnected &&
-                canReconnect &&
-                userCanReconnect &&
                 IsStarted &&
+                canReconnect &&
                 configuration.AutoReconnect &&
-                (DateTime.UtcNow - lastDisconnectedStatus).TotalMilliseconds > configuration.AutoReconnectDelay)
+                (DateTime.UtcNow - reconnectTimerStartFrom).TotalMilliseconds > configuration.AutoReconnectDelay)
             {
-                logger.Info($"Reconnecting to {lastEndpoint}...");
-                canReconnect = false;
-                _ = ConnectAsync(lastEndpoint);
+                if (!OnReconnecting())
+                {
+                    reconnectTimerStartFrom = DateTime.UtcNow;
+                }
+                else
+                {
+                    logger.Info($"Reconnecting to {lastEndpoint}...");
+                    _ = ConnectAsync(lastEndpoint);
+                }
             }
         }
 
         protected virtual void OnStatusChanged(ClientStatusChangedEventArgs args)
         {
 
+        }
+
+        protected virtual bool OnReconnecting()
+        {
+            return true;
         }
 
         public async Task ConnectAsync(string host, int port)
@@ -132,7 +141,7 @@ namespace Warden.Networking.Tcp
             try
             {
                 ChangeStatus(TcpConnectionStatus.Connecting);
-
+                
                 clientSocket = this.GetNewSocket();
                 this.SetSocketOptions(clientSocket);
                 await clientSocket.ConnectAsync(endpoint)
@@ -148,19 +157,19 @@ namespace Warden.Networking.Tcp
                     throw new InvalidOperationException("Connection reset");
                 this.Connection = connection;
                 ChangeStatus(TcpConnectionStatus.Connected);
+                canReconnect = true;
             }
             catch
             {
                 if (clientSocket != null)
                     clientSocket.Dispose();
-                Disconnect();
+                DisconnectInternal();
 
                 throw;
             }
             finally
             {
                 lastEndpoint = endpoint;
-                canReconnect = true;
             }
         }
 
@@ -199,9 +208,9 @@ namespace Warden.Networking.Tcp
             ChangeStatus(TcpConnectionStatus.Disconnected);
         }
 
-        public void Disconnect()
+        public void Disconnect(bool stopAutoReconnecting = true)
         {
-            canReconnect = false;
+            canReconnect = !stopAutoReconnecting;
             DisconnectInternal();
         }
     }

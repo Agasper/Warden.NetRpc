@@ -14,7 +14,6 @@ namespace Warden.Networking.Udp.Channels
         bool[] recvEarlyReceived;
         Datagram[] recvWithheld;
 
-        object ackMutex = new object();
         int ackWindowStart;
         PendingPacket[] sendPendingPackets;
         ConcurrentQueue<Datagram> sendDelayedPackets;
@@ -40,7 +39,7 @@ namespace Warden.Networking.Udp.Channels
         {
             if (recvWithheld != null)
             {
-                for(int i = 0; i < recvWithheld.Length; i++)
+                for (int i = 0; i < recvWithheld.Length; i++)
                 {
                     var record = recvWithheld[i];
                     if (record != null)
@@ -54,7 +53,7 @@ namespace Warden.Networking.Udp.Channels
                 sendPendingPackets[i].Clear();
             }
 
-            while(sendDelayedPackets.TryDequeue(out Datagram dequeued))
+            while (sendDelayedPackets.TryDequeue(out Datagram dequeued))
             {
                 dequeued.Dispose();
             }
@@ -71,7 +70,7 @@ namespace Warden.Networking.Udp.Channels
 
         public override void OnAckReceived(Datagram datagram)
         {
-            lock (ackMutex)
+            lock (channelMutex)
             {
                 int relate = RelativeSequenceNumber(datagram.Sequence, ackWindowStart);
                 if (relate < 0)
@@ -97,11 +96,7 @@ namespace Warden.Networking.Udp.Channels
                     }
 
                     datagram.Dispose();
-
-                    lock (this.sequenceOutMutex)
-                    {
-                        TrySendDelayedPackets();
-                    }
+                    TrySendDelayedPackets();
 
                     return;
                 }
@@ -158,10 +153,10 @@ namespace Warden.Networking.Udp.Channels
 
             connection.SendDatagramAsync(datagram.CreateAck());
 
-            lock (sequenceInMutex)
+            lock (channelMutex)
             {
                 int relate = RelativeSequenceNumber(datagram.Sequence, recvWindowStart);
-                if (relate == 0) 
+                if (relate == 0)
                 {
                     //right in time
                     connection.ReleaseDatagram(datagram);
@@ -236,16 +231,15 @@ namespace Warden.Networking.Udp.Channels
 
         public override void PollEvents()
         {
-            lock (ackMutex)
+            int ackWindowStart = this.ackWindowStart;
+            int lastSequenceOut = this.lastSequenceOut;
+
+            for (int pendingSeq = ackWindowStart; pendingSeq != lastSequenceOut; pendingSeq = (pendingSeq + 1) % MAX_SEQUENCE)
             {
-                for (int pendingSeq = ackWindowStart; pendingSeq != this.lastSequenceOut; pendingSeq = (pendingSeq + 1) % MAX_SEQUENCE)
+                var delay = DateTime.UtcNow - sendPendingPackets[pendingSeq % WINDOW_SIZE].Timestamp;
+                if (sendPendingPackets[pendingSeq % WINDOW_SIZE].TryReSend(SendPendingPacket, connection.GetInitialResendDelay(), true))
                 {
-                    var delay = DateTime.UtcNow - sendPendingPackets[pendingSeq % WINDOW_SIZE].Timestamp;
-                    if (sendPendingPackets[pendingSeq % WINDOW_SIZE].TryReSend(SendPendingPacket, connection.GetInitialResendDelay(), true))
-                    {
-                        //Console.WriteLine($"Resend {sendPendingPackets[pendingSeq % WINDOW_SIZE].Datagram} after {delay.TotalMilliseconds} ({connection.GetInitialResendDelay()}) with num {sendPendingPackets[pendingSeq % WINDOW_SIZE].ReSendNum}");
-                        logger.Debug($"Resend {sendPendingPackets[pendingSeq % WINDOW_SIZE].Datagram} after {delay.TotalMilliseconds} with num {sendPendingPackets[pendingSeq % WINDOW_SIZE].ReSendNum}");
-                    }
+                    logger.Debug($"Resend {sendPendingPackets[pendingSeq % WINDOW_SIZE].Datagram} after {delay.TotalMilliseconds} with num {sendPendingPackets[pendingSeq % WINDOW_SIZE].ReSendNum}");
                 }
             }
         }
@@ -265,8 +259,12 @@ namespace Warden.Networking.Udp.Channels
 
         UdpSendStatus SendImmidiately(Datagram datagram)
         {
-            datagram.Sequence = GetNextSequenceOut();
-            sendPendingPackets[datagram.Sequence % WINDOW_SIZE].Init(datagram);
+            lock (channelMutex)
+            {
+                datagram.Sequence = GetNextSequenceOut();
+                sendPendingPackets[datagram.Sequence % WINDOW_SIZE].Init(datagram);
+            }
+
             _ = connection.SendDatagramAsync(datagram);
             return UdpSendStatus.Enqueued;
         }
@@ -275,29 +273,29 @@ namespace Warden.Networking.Udp.Channels
         {
             CheckDatagramValid(datagram);
 
-            lock (this.sequenceOutMutex)
+            TrySendDelayedPackets();
+            if (!CanSendImmidiately())
             {
-                TrySendDelayedPackets();
-                if (!CanSendImmidiately())
-                {
-                    logger.Debug($"Can't send right now (window is full) {datagram}. Delaying...");
-                    sendDelayedPackets.Enqueue(datagram);
-                    return UdpSendStatus.Enqueued;
-                }
-                else
-                    return SendImmidiately(datagram);
+                logger.Debug($"Can't send right now (window is full) {datagram}. Delaying...");
+                sendDelayedPackets.Enqueue(datagram);
+                return UdpSendStatus.Enqueued;
             }
+            else
+            {
+                return SendImmidiately(datagram);
+            }
+
         }
 
         bool CanSendImmidiately()
         {
-            lock (this.sequenceOutMutex)
+            lock (channelMutex)
             {
-                lock (ackMutex)
-                {
-                    int relate = RelativeSequenceNumber(this.lastSequenceOut, ackWindowStart);
-                    return relate < WINDOW_SIZE;
-                }
+                int lastSequenceOut = this.lastSequenceOut;
+                int ackWindowStart = this.ackWindowStart;
+
+                int relate = RelativeSequenceNumber(lastSequenceOut, ackWindowStart);
+                return relate < WINDOW_SIZE;
             }
         }
     }

@@ -121,8 +121,7 @@ namespace Warden.Networking.Messages
 
         public override string ToString()
         {
-            CheckDisposed();
-            if (stream == null)
+            if (stream == null || disposed)
                 return $"{this.GetType().Name}[size=0]";
             else
                 return $"{this.GetType().Name}[size={stream.Length}]";

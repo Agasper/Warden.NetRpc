@@ -40,7 +40,7 @@ namespace Warden.Networking.Tcp
 
         public virtual void Shutdown()
         {
-            this.poller.StopPolling(true);
+            this.poller.StopPolling(false);
         }
 
         protected void CheckStarted()

@@ -25,7 +25,6 @@ namespace Warden.Rpc
         readonly object orderedExecutionTaskMutex = new object();
         readonly object lastRequestIdMutex = new object();
         readonly ILogger logger;
-        readonly CancellationTokenSource cancellationTokenSource;
         readonly TaskScheduler taskScheduler;
 
         Task orderedExecutionTask;
@@ -43,7 +42,6 @@ namespace Warden.Rpc
                 throw new ArgumentNullException(nameof(configuration.Connection));
             if (configuration.TaskScheduler == null)
                 throw new ArgumentNullException(nameof(configuration.TaskScheduler));
-            this.cancellationTokenSource = new CancellationTokenSource();
             this.requests = new ConcurrentDictionary<uint, RemotingRequest>();
             this.rpcSerializer = configuration.Serializer;
             this.orderedExecution = configuration.OrderedExecution;
@@ -62,8 +60,6 @@ namespace Warden.Rpc
                 return false;
             closed = true;
 
-            this.cancellationTokenSource.Dispose();
-
             lock (requestsMutex)
             {
                 foreach (var pair in requests)
@@ -79,12 +75,6 @@ namespace Warden.Rpc
                 this.logger.Debug($"{this} closed with exception: {exception}");
 
             return true;
-        }
-
-        CancellationToken GetCancellationToken()
-        {
-            var cts = cancellationTokenSource;
-            return cts == null ? default : cts.Token;
         }
 
         protected void CheckClosed()
@@ -188,7 +178,7 @@ namespace Warden.Rpc
                     Interlocked.Increment(ref executionQueueSize);
                     orderedExecutionTask = orderedExecutionTask.ContinueWith((t, o)
                         => ExecuteRequestOuterAsync(o as RemotingRequest), request,
-                            GetCancellationToken(),
+                            default,
                             TaskContinuationOptions.None,
                             taskScheduler).Unwrap();
                 }
@@ -197,6 +187,12 @@ namespace Warden.Rpc
 
         async Task ExecuteRequestOuterAsync(RemotingRequest request)
         {
+            if (this.closed)
+            {
+                logger.Debug($"Dropping incoming request {request}, connection already closed");
+                return;
+            }
+
             ExecutionRequest executionRequest = ExecutionRequest.FromRemotingMessage(request);
             try
             {
