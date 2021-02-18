@@ -5,6 +5,6 @@ namespace Warden.Rpc.Net
 {
     public interface ISessionFactory
     {
-        //object CreateSession(RpcTcpConnection tcpConnection);
+        RpcSession CreateSession(RpcSessionContext context);
     }
 }

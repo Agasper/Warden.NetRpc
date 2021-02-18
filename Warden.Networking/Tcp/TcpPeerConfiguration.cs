@@ -20,6 +20,8 @@ namespace Warden.Networking.Tcp
         public int KeepAliveInterval { get => keepAliveInterval; set { CheckLocked(); keepAliveInterval = value; } }
         public int KeepAliveTimeout { get => keepAliveTimeout; set { CheckLocked(); keepAliveTimeout = value; } }
 
+        public ContextSynchronizationMode ContextSynchronizationMode { get => contextSynchronizationMode; set { CheckLocked(); contextSynchronizationMode = value; } }
+
         //internal SynchronizationContext SyncronizationContext => syncronizationContext;
 
         protected int bufferSize;
@@ -34,6 +36,7 @@ namespace Warden.Networking.Tcp
 
         protected ConnectionSimulation connectionSimulation;
         protected SynchronizationContext syncronizationContext;
+        protected ContextSynchronizationMode contextSynchronizationMode;
 
         protected bool locked;
 
@@ -72,13 +75,14 @@ namespace Warden.Networking.Tcp
 
         internal void SynchronizeSafe(Action callback, ILogger logger)
         {
-            ContextSynchronizationHelper.SynchronizeSafe(this.syncronizationContext,
+            ContextSynchronizationHelper.SynchronizeSafe(this.syncronizationContext, this.contextSynchronizationMode,
                 callback, logger);
         }
 
         public TcpPeerConfiguration()
         {
             syncronizationContext = new SynchronizationContext();
+            contextSynchronizationMode = ContextSynchronizationMode.Send;
 
             memoryStreamPool = MemoryStreamPool.Shared;
             bufferSize = ushort.MaxValue;

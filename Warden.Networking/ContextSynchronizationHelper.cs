@@ -6,11 +6,14 @@ namespace Warden.Networking
 {
     public static class ContextSynchronizationHelper
     {
-        public static void SynchronizeSafe(SynchronizationContext context, Action callback, ILogger logger)
+        public static void SynchronizeSafe(SynchronizationContext context, ContextSynchronizationMode mode, Action callback, ILogger logger)
         {
             try
             {
-                context.Send((s) => callback(), null);
+                if (mode == ContextSynchronizationMode.Send)
+                    context.Send((s) => callback(), null);
+                else
+                    context.Post((s) => callback(), null);
             }
             catch (Exception ex)
             {

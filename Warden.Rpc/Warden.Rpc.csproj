@@ -28,6 +28,7 @@
     <Folder Include="Net\" />
     <Folder Include="Net\Tcp\" />
     <Folder Include="Net\Tcp\Events\" />
+    <Folder Include="Net\Udp\" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="SN\SN.snk" />
