@@ -8,10 +8,18 @@ namespace Warden.Rpc.Net.Udp
     {
         class UdpServerOverride : UdpServer
         {
-            public UdpServerOverride(UdpServerConfiguration configuration) : base(configuration) { }
+            RpcUdpServerConfiguration configuration;
+
+            public UdpServerOverride(RpcUdpServerConfiguration configuration) : base(configuration)
+            {
+                this.configuration = configuration;
+            }
+            
             protected override UdpConnection CreateConnection()
             {
-                return new RpcUdpConnection(this);
+                var connection = new RpcUdpConnection(this, configuration);
+                connection.CreateSession();
+                return connection;
             }
         }
 
@@ -20,6 +28,10 @@ namespace Warden.Rpc.Net.Udp
 
         public RpcUdpServer(RpcUdpServerConfiguration configuration)
         {
+            if (configuration.Serializer == null)
+                throw new ArgumentNullException(nameof(configuration.Serializer));
+            if (configuration.SessionFactory == null)
+                throw new ArgumentNullException(nameof(configuration.Serializer));
             this.configuration = configuration;
             this.udpServer = new UdpServerOverride(configuration);
         }

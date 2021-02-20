@@ -7,7 +7,7 @@ namespace Warden.Rpc
     {
         object Tag { get; set; }
 
-        bool Close(Exception exception = null);
+        bool Close();
 
         Task ExecuteAsync(int methodIdentity);
         Task ExecuteAsync(string methodIdentity);

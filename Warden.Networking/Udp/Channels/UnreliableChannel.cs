@@ -18,7 +18,7 @@ namespace Warden.Networking.Udp.Channels
             CheckDatagramValid(datagram);
             datagram.Sequence = GetNextSequenceOut();
             _ = connection.SendDatagramAsync(datagram);
-            return UdpSendStatus.Enqueued;
+            return UdpSendStatus.Sent;
         }
 
         public override void OnDatagram(Datagram datagram)

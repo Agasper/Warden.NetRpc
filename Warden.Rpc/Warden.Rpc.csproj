@@ -29,6 +29,7 @@
     <Folder Include="Net\Tcp\" />
     <Folder Include="Net\Tcp\Events\" />
     <Folder Include="Net\Udp\" />
+    <Folder Include="Sessions" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="SN\SN.snk" />

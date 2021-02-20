@@ -1,15 +1,14 @@
-﻿using System;
 namespace Warden.Rpc
 {
     public struct ExecutionResult
     {
-        public bool HasResult { get; set; }
-        public object Result { get; set; }
+        public bool HasResult { get; private set; }
+        public object Result { get; private set; }
 
-        public ExecutionResult(object result)
+        public ExecutionResult(bool hasResult, object result)
         {
-            HasResult = true;
-            Result = result;
+            this.HasResult = hasResult;
+            this.Result = result;
         }
     }
 }

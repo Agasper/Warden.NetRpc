@@ -46,7 +46,6 @@ namespace Warden.Networking.Tcp
         }
         public DateTime Started { get; private set; }
         public TcpPeer Parent { get; private set; }
-        public CancellationToken CancellationToken => cancellationTokenSource != null ? cancellationTokenSource.Token : default;
         public TcpConnectionStatistics Statistics { get; private set; }
 
         protected DateTime? LastKeepAliveRequestReceived { get; private set; }
@@ -58,9 +57,8 @@ namespace Warden.Networking.Tcp
         DateTime lastKeepAliveSent;
         bool keepAliveResponseGot;
         SemaphoreSlim sendSemaphore;
-        CancellationTokenSource cancellationTokenSource;
 
-        volatile bool closing;
+        volatile bool closed;
         volatile bool disposed;
         volatile bool stashed;
         volatile Task sendTask;
@@ -112,10 +110,9 @@ namespace Warden.Networking.Tcp
             this.logger.Meta["connection_id"] = connectionId;
             this.keepAliveResponseGot = true;
             this.Id = connectionId;
-            this.cancellationTokenSource = new CancellationTokenSource();
             this.socket = socket;
             this.sendTask = Task.CompletedTask;
-            this.closing = false;
+            this.closed = false;
             this.Started = DateTime.UtcNow;
             logger.Info($"Connection initialized {this}");
         }
@@ -142,13 +139,7 @@ namespace Warden.Networking.Tcp
                 this.awaitingNextMessage.Dispose();
                 this.awaitingNextMessage = null;
             }
-
-            if (this.cancellationTokenSource != null)
-            {
-                this.cancellationTokenSource.Dispose();
-                this.cancellationTokenSource = null;
-            }
-
+            
             while (this.latencySimulationRecvBag.TryDequeue(out DelayedMessage removed))
                 removed.message.Dispose();
 
@@ -173,12 +164,6 @@ namespace Warden.Networking.Tcp
             {
                 this.awaitingNextMessage.Dispose();
                 this.awaitingNextMessage = null;
-            }
-
-            if (this.cancellationTokenSource != null)
-            {
-                this.cancellationTokenSource.Dispose();
-                this.cancellationTokenSource = null;
             }
 
             if (sendSemaphore != null)
@@ -217,23 +202,21 @@ namespace Warden.Networking.Tcp
 
         }
 
-        public void Close()
+        public virtual void Close()
         {
-            if (closing)
-                return;
-            closing = true;
-
             CloseInternal();
         }
 
         void CloseInternal()
         {
+            if (closed)
+                return;
+            closed = true;
+            
             try
             {
                 logger.Debug($"{this} closing!");
-
-                this.cancellationTokenSource.Cancel();
-
+                
                 var socket_ = socket;
                 if (socket_ != null)
                 {
@@ -254,7 +237,7 @@ namespace Warden.Networking.Tcp
             }
             catch (Exception ex)
             {
-                logger.Critical("Exception on connection close: " + ex.ToString());
+                logger.Critical("Exception on connection close: " + ex);
             }
         }
 
@@ -404,7 +387,7 @@ namespace Warden.Networking.Tcp
             }, logger);
         }
 
-        internal protected virtual void PollEventsInternal()
+        protected internal virtual void PollEventsInternal()
         {
             if (Parent.Configuration.KeepAliveEnabled)
             {
@@ -436,7 +419,7 @@ namespace Warden.Networking.Tcp
 
             Statistics.PollEvents();
 
-            while (latencySimulationRecvBag.Count > 0 && !closing)
+            while (latencySimulationRecvBag.Count > 0 && !closed)
             {
                 if (latencySimulationRecvBag.TryPeek(out DelayedMessage msg))
                 {
@@ -470,7 +453,7 @@ namespace Warden.Networking.Tcp
 
         async Task SendMessageAsync(TcpRawMessage message, TcpRawMessageOptions options)
         {
-            if (closing)
+            if (closed)
             {
                 message.Dispose();
                 throw new InvalidOperationException($"Connection is closed");
@@ -483,41 +466,20 @@ namespace Warden.Networking.Tcp
                     await Task.Delay(delay).ConfigureAwait(false);
             }
 
+            Task newSendTask = null;
             lock (sendMutex)
             {
                 sendTask = sendTask.ContinueWith(
                     (task, tuple) =>
                 {
-                    if (this.CancellationToken.IsCancellationRequested)
-                    {
-                        ((SendTuple)tuple).Message.Dispose();
-                        return Task.FromCanceled(this.CancellationToken);
-                    }
-
                     return SendMessageInternalAsync((SendTuple)tuple);
                 }, new SendTuple(message, options))
                         .Unwrap();
+
+                newSendTask = sendTask;
             }
 
-            await sendTask.ConfigureAwait(false);
-        }
-
-        public Task FlushSendQueueAsync()
-        {
-            //if (closing)
-            //    throw new InvalidOperationException($"Connection is closed");
-
-            return sendTask;
-        }
-
-        public Task FlushSendQueueAndCloseAsync()
-        {
-            //if (closing)
-            //    throw new InvalidOperationException($"Connection is closed");
-
-            lock(sendMutex)
-                sendTask = sendTask.ContinueWith((t) => Close(), this.CancellationToken);
-            return sendTask;
+            await newSendTask.ConfigureAwait(false);
         }
 
         async Task SendMessageInternalAsync(SendTuple sendTuple)
@@ -525,8 +487,8 @@ namespace Warden.Networking.Tcp
             try
             {
                 var socket = this.socket;
-                if (closing || socket == null || !socket.Connected)
-                    return;
+                if (closed || !socket.Connected)
+                    throw new OperationCanceledException("Send operation cancelled. Socket not connected");
 
 
                 await sendSemaphore.WaitAsync().ConfigureAwait(false);

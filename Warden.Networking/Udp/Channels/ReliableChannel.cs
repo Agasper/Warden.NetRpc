@@ -266,7 +266,7 @@ namespace Warden.Networking.Udp.Channels
             }
 
             _ = connection.SendDatagramAsync(datagram);
-            return UdpSendStatus.Enqueued;
+            return UdpSendStatus.Sent;
         }
 
         public override UdpSendStatus SendDatagram(Datagram datagram)

@@ -66,15 +66,15 @@ namespace Warden.Networking.Udp
                 throw new ArgumentNullException(nameof(value));
         }
 
-        public void CaptureSynchronizationContext()
+        public virtual void CaptureSynchronizationContext()
         {
             CheckLocked();
             if (SynchronizationContext.Current == null)
-                throw new ArgumentNullException("Synchronization context is null");
+                throw new NullReferenceException("Synchronization context is null");
             this.syncronizationContext = SynchronizationContext.Current;
         }
 
-        public void SetSynchronizationContext(SynchronizationContext context)
+        public virtual void SetSynchronizationContext(SynchronizationContext context)
         {
             CheckLocked();
             if (context == null)
@@ -91,6 +91,7 @@ namespace Warden.Networking.Udp
         public UdpPeerConfiguration()
         {
             syncronizationContext = new SynchronizationContext();
+            tooLargeMessageBehaviour = TooLargeMessageBehaviour.RaiseException;
             contextSynchronizationMode = ContextSynchronizationMode.Send;
             networkReceiveThreads = Environment.ProcessorCount;
             memoryStreamPool = MemoryStreamPool.Shared;

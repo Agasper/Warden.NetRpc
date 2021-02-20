@@ -10,16 +10,8 @@ namespace Warden.Rpc
     {
         public bool allowAsync;
         public bool allowNonVoid;
-        public bool canUseLambdas;
+        public bool dontUseLambdaExpressions;
         public bool onlyPublicMethods;
-
-        public RemotingObjectConfiguration(bool canUseLambdas, bool allowAsync, bool allowNonVoid)
-        {
-            this.canUseLambdas = canUseLambdas;
-            this.allowAsync = allowAsync;
-            this.allowNonVoid = allowNonVoid;
-            this.onlyPublicMethods = false;
-        }
     }
 
     public class RemotingObjectScheme
@@ -35,7 +27,7 @@ namespace Warden.Rpc
             Init(configuration, entityType);
         }
 
-        public MethodContainer GetInvokationContainer(object key)
+        public MethodContainer GetInvocationContainer(object key)
         {
             //if (!init)
             //    throw new InvalidOperationException($"Call {nameof(Init)} first");
@@ -77,18 +69,18 @@ namespace Warden.Rpc
                     throw new TypeLoadException($"Non void method not allowed in {entityType.FullName}");
 
                 if (asyncAttr != null && method.ReturnType == typeof(void))
-                    throw new TypeLoadException($"Async void methods not allowed: {entityType.FullName}, {method.Name}");
+                    throw new TypeLoadException($"Async void methods not allowed: {entityType.FullName}, {method.Name}. Please change it to async Task.");
 
                 switch (attr.MethodIdentityType)
                 {
                     case RemotingMethodAttribute.MethodIdentityTypeEnum.ByIndex:
-                        myRemotingMethods2.Add(attr.Index, new MethodContainer(method, configuration.canUseLambdas));
+                        myRemotingMethods2.Add(attr.Index, new MethodContainer(method, !configuration.dontUseLambdaExpressions));
                         break;
                     case RemotingMethodAttribute.MethodIdentityTypeEnum.ByName:
-                        myRemotingMethods2.Add(attr.Name, new MethodContainer(method, configuration.canUseLambdas));
+                        myRemotingMethods2.Add(attr.Name, new MethodContainer(method, !configuration.dontUseLambdaExpressions));
                         break;
                     case RemotingMethodAttribute.MethodIdentityTypeEnum.Default:
-                        myRemotingMethods2.Add(method.Name, new MethodContainer(method, configuration.canUseLambdas));
+                        myRemotingMethods2.Add(method.Name, new MethodContainer(method, !configuration.dontUseLambdaExpressions));
                         break;
                     default:
                         throw new ArgumentException($"Could not get method identification for {method.Name}");

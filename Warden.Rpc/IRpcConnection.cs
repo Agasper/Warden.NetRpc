@@ -1,17 +1,21 @@
 ﻿using System;
 using System.Net;
 using System.Threading.Tasks;
+using Warden.Networking.Udp.Messages;
 using Warden.Rpc.Payload;
 
 namespace Warden.Rpc
 {
-    public interface IRpcConnection
+    public interface IRpcConnectionTcp
     {
         object Tag { get; }
         EndPoint RemoteEndpoint { get; }
-        void SendMessage(ICustomMessage message, SendingOptions sendingOptions);
-        void SendMessage(ICustomMessage message);
-        Task FlushSendQueueAndCloseAsync();
+        bool SendReliable(ICustomMessage message);
         void Close();
+    }
+    
+    public interface IRpcConnectionUdp : IRpcConnectionTcp
+    {
+        bool SendCustom(ICustomMessage message, DeliveryType deliveryType, int channel);
     }
 }
