@@ -29,7 +29,7 @@ namespace Warden.Networking.Tcp
 
         private protected override ILogger Logger => logger;
 
-        new TcpClientConfiguration configuration;
+        new TcpConfigurationClient configuration;
         TcpConnectionStatus status;
         long connectionId;
         Socket clientSocket;
@@ -39,7 +39,7 @@ namespace Warden.Networking.Tcp
         DateTime reconnectTimerStartFrom;
         IPEndPoint lastEndpoint;
 
-        public TcpClient(TcpClientConfiguration configuration) : base(configuration)
+        public TcpClient(TcpConfigurationClient configuration) : base(configuration)
         {
             this.configuration = configuration;
             this.logger = configuration.LogManager.GetLogger(nameof(TcpClient));
@@ -150,11 +150,13 @@ namespace Warden.Networking.Tcp
                 var connection = this.CreateConnection();
                 connection.CheckParent(this);
                 long newId = Interlocked.Increment(ref connectionId);
+                
                 connection.Init(newId, clientSocket);
                 connection.StartReceive();
-
+                
                 if (!connection.Connected)
                     throw new InvalidOperationException("Connection reset");
+                
                 this.Connection = connection;
                 ChangeStatus(TcpConnectionStatus.Connected);
                 canReconnect = true;

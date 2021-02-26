@@ -1,7 +1,7 @@
 ﻿using System;
 namespace Warden.Networking.Tcp
 {
-    public class TcpServerConfiguration : TcpPeerConfiguration
+    public class TcpConfigurationServer : TcpConfigurationPeer
     {
         public int MaximumConnections { get => maximumConnections; set { CheckLocked(); maximumConnections = value; } }
         public int ListenBacklog { get => listenBackLog; set { CheckLocked(); listenBackLog = value; } }
@@ -11,7 +11,7 @@ namespace Warden.Networking.Tcp
         protected int listenBackLog;
         protected int maximumConnections;
 
-        public TcpServerConfiguration()
+        public TcpConfigurationServer()
         {
             listenBackLog = 100;
             acceptThreads = 1;

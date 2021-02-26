@@ -5,6 +5,8 @@ namespace Warden.Networking.Udp.Messages
 {
     public struct ChannelDescriptor
     {
+        public const int DEFAULT_CHANNEL = 0;
+        
         public int Channel
         {
             get => channel;

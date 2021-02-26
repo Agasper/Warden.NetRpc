@@ -5,12 +5,10 @@ namespace Warden.Networking.Cryptography
 {
     public class Aes128Cipher : ICipher, IDisposable
     {
+        public int KeySize => cipher.KeySize / 8;
+        
         Aes cipher;
-
-        public Aes128Cipher(byte[] key) : this()
-        {
-            SetKey(key);
-        }
+        bool keyInitialized = false;
 
         public Aes128Cipher()
         {
@@ -21,21 +19,36 @@ namespace Warden.Networking.Cryptography
             cipher.Mode = CipherMode.CBC;
         }
 
+        public void SetKey(byte[] key, byte[] iv)
+        {
+            if (keyInitialized)
+                throw new InvalidOperationException("Key already initialized");
+            if (key.Length != KeySize)
+                throw new ArgumentException($"Wrong key length. Expected {KeySize} bytes");
+            
+            cipher.Key = key;
+            cipher.IV = iv;
+            keyInitialized = true;
+        }
+        
         public void SetKey(byte[] key)
         {
-            cipher.Key = key;
             byte[] iv = new byte[cipher.BlockSize / 8];
             Buffer.BlockCopy(key, 0, iv, 0, iv.Length);
-            cipher.IV = iv;
+            this.SetKey(key, iv);
         }
 
         public ICryptoTransform CreateEncryptor()
         {
+            if (!keyInitialized)
+                throw new InvalidOperationException("Key isn't set");
             return cipher.CreateEncryptor();
         }
 
         public ICryptoTransform CreateDecryptor()
         {
+            if (!keyInitialized)
+                throw new InvalidOperationException("Key isn't set");
             return cipher.CreateDecryptor();
         }
 

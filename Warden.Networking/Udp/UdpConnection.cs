@@ -32,6 +32,7 @@ namespace Warden.Networking.Udp
         public UdpConnectionStatistics Statistics { get; private set; }
         public UdpConnectionStatus Status { get; private set; }
         public UdpNetEndpoint EndPoint { get; private set; }
+        public object Tag { get; set; }
 
         UdpPeer peer;
         ILogger logger;

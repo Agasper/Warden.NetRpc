@@ -6,8 +6,11 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Warden.Logging;
+using Warden.Networking.Cryptography;
+using Warden.Networking.IO;
 using Warden.Networking.Tcp.Events;
 using Warden.Networking.Tcp.Messages;
+using Warden.Util;
 
 namespace Warden.Networking.Tcp
 {
@@ -38,12 +41,15 @@ namespace Warden.Networking.Tcp
         {
             get
             {
+                if (closed)
+                    return false;
                 var socket_ = this.socket;
                 if (socket_ == null)
                     return false;
                 return socket_.Connected;
             }
         }
+
         public DateTime Started { get; private set; }
         public TcpPeer Parent { get; private set; }
         public TcpConnectionStatistics Statistics { get; private set; }
@@ -63,13 +69,13 @@ namespace Warden.Networking.Tcp
         volatile bool stashed;
         volatile Task sendTask;
         readonly object sendMutex = new object();
-        
+
         protected readonly ILogger logger;
         TcpRawMessageHeader awaitingMessageHeader;
+        
         readonly byte[] recvBuffer;
         readonly byte[] sendBuffer;
-
-        readonly ConcurrentQueue<DelayedMessage> latencySimulationRecvBag;
+        readonly ConcurrentQueue<DelayedMessage> latencySimulationRecvQueue;
 
         struct DelayedMessage //for latency simulation
         {
@@ -80,7 +86,7 @@ namespace Warden.Networking.Tcp
 
         public TcpConnection(TcpPeer parent)
         {
-            this.latencySimulationRecvBag = new ConcurrentQueue<DelayedMessage>();
+            this.latencySimulationRecvQueue = new ConcurrentQueue<DelayedMessage>();
             this.stashed = true;
             this.Statistics = new TcpConnectionStatistics();
             this.sendSemaphore = new SemaphoreSlim(1, 1);
@@ -115,6 +121,8 @@ namespace Warden.Networking.Tcp
             this.closed = false;
             this.Started = DateTime.UtcNow;
             logger.Info($"Connection initialized {this}");
+            
+            Parent.OnConnectionOpenedInternal(this);
         }
 
         public virtual void Stash()
@@ -140,7 +148,7 @@ namespace Warden.Networking.Tcp
                 this.awaitingNextMessage = null;
             }
             
-            while (this.latencySimulationRecvBag.TryDequeue(out DelayedMessage removed))
+            while (this.latencySimulationRecvQueue.TryDequeue(out DelayedMessage removed))
                 removed.message.Dispose();
 
             stashed = true;
@@ -178,7 +186,6 @@ namespace Warden.Networking.Tcp
         public void Dispose()
         {
             Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         void DestroySocket()
@@ -198,6 +205,11 @@ namespace Warden.Networking.Tcp
         }
 
         protected internal virtual void OnConnectionClosed(ConnectionClosedEventArgs args)
+        {
+
+        }
+        
+        protected internal virtual void OnConnectionOpened(ConnectionOpenedEventArgs args)
         {
 
         }
@@ -230,10 +242,13 @@ namespace Warden.Networking.Tcp
                         DestroySocket();
                     }
                 }
-
+                
                 logger.Info($"{this} closed!");
 
                 Parent.OnConnectionClosedInternal(this);
+                
+                if (!this.disposed && !this.stashed)
+                    this.Dispose();
             }
             catch (Exception ex)
             {
@@ -342,7 +357,7 @@ namespace Warden.Networking.Tcp
             if (Parent.Configuration.ConnectionSimulation != null)
             {
                 int delay = Parent.Configuration.ConnectionSimulation.GetHalfDelay();
-                latencySimulationRecvBag.Enqueue(new DelayedMessage()
+                latencySimulationRecvQueue.Enqueue(new DelayedMessage()
                 {
                     header = header,
                     message = message,
@@ -419,13 +434,13 @@ namespace Warden.Networking.Tcp
 
             Statistics.PollEvents();
 
-            while (latencySimulationRecvBag.Count > 0 && !closed)
+            while (latencySimulationRecvQueue.Count > 0 && Connected)
             {
-                if (latencySimulationRecvBag.TryPeek(out DelayedMessage msg))
+                if (latencySimulationRecvQueue.TryPeek(out DelayedMessage msg))
                 {
                     if (DateTime.UtcNow > msg.releaseTimestamp)
                     {
-                        latencySimulationRecvBag.TryDequeue(out DelayedMessage _msg);
+                        latencySimulationRecvQueue.TryDequeue(out DelayedMessage _msg);
                         OnMessageReceivedInternal(msg.header, msg.message);
                     }
                     else
@@ -453,10 +468,10 @@ namespace Warden.Networking.Tcp
 
         async Task SendMessageAsync(TcpRawMessage message, TcpRawMessageOptions options)
         {
-            if (closed)
+            if (!Connected)
             {
                 message.Dispose();
-                throw new InvalidOperationException($"Connection is closed");
+                throw new InvalidOperationException($"Connection is not established");
             }
 
             if (Parent.Configuration.ConnectionSimulation != null)
@@ -487,9 +502,8 @@ namespace Warden.Networking.Tcp
             try
             {
                 var socket = this.socket;
-                if (closed || !socket.Connected)
-                    throw new OperationCanceledException("Send operation cancelled. Socket not connected");
-
+                if (!Connected)
+                    throw new OperationCanceledException("Send operation cancelled. Connection not established");
 
                 await sendSemaphore.WaitAsync().ConfigureAwait(false);
 

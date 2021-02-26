@@ -1,16 +1,19 @@
 ﻿using System;
 namespace Warden.Rpc.Net.Tcp.Events
 {
-    //public class SessionOpenedEventArgs<T>
-    //{
-    //    public RpcTcpConnection<T> Connection { get; private set; }
+    public class SessionOpenedEventArgs
+    {
+        public RpcSession Session { get; private set; }
+        public RpcTcpConnection Connection { get; private set; }
 
-    //    internal SessionOpenedEventArgs(RpcTcpConnection<T> connection)
-    //    {
-    //        if (connection == null)
-    //            throw new ArgumentNullException(nameof(connection));
-    //        this.Connection = connection;
-    //    }
-
-    //}
+        internal SessionOpenedEventArgs(RpcSession session, RpcTcpConnection connection)
+        {
+            if (session == null)
+                throw new ArgumentNullException(nameof(session));
+            if (connection == null)
+                throw new ArgumentNullException(nameof(connection));
+            this.Session = session;
+            this.Connection = connection;
+        }
+    }
 }

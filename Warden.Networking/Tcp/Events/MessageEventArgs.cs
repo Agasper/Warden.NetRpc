@@ -8,7 +8,7 @@ namespace Warden.Networking.Tcp.Events
         public TcpConnection Connection { get; private set; }
         public TcpRawMessage Message { get; private set; }
 
-        internal MessageEventArgs(TcpConnection connection, TcpRawMessage message)
+        public MessageEventArgs(TcpConnection connection, TcpRawMessage message)
         {
             if (connection == null)
                 throw new ArgumentNullException(nameof(connection));

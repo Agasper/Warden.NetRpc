@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Net.Sockets;
 using Warden.Logging;
 using Warden.Networking.Tcp.Events;
 using Warden.Networking.Tcp.Messages;
 using Warden.Util.Polling;
+using Warden.Util.Pooling;
 
 namespace Warden.Networking.Tcp
 {
@@ -16,16 +18,14 @@ namespace Warden.Networking.Tcp
         public event DOnConnectionOpened OnConnectionOpenedEvent;
 
         public object Tag { get; set; }
-        public TcpPeerConfiguration Configuration => configuration;
+        public TcpConfigurationPeer Configuration => configuration;
         public bool IsStarted => poller.IsStarted;
 
-        private protected TcpPeerConfiguration configuration;
-
+        private protected readonly TcpConfigurationPeer configuration;
         private protected abstract ILogger Logger { get; }
+        readonly Poller poller;
 
-        Poller poller;
-
-        public TcpPeer(TcpPeerConfiguration configuration)
+        public TcpPeer(TcpConfigurationPeer configuration)
         {
             configuration.Lock();
             this.configuration = configuration;
@@ -90,6 +90,8 @@ namespace Warden.Networking.Tcp
 
         internal virtual void OnConnectionClosedInternal(TcpConnection tcpConnection)
         {
+            Logger.Debug($"Connection {tcpConnection} closed!");
+            
             configuration.SynchronizeSafe(() =>
             {
                 var args = new ConnectionClosedEventArgs(tcpConnection);
@@ -129,9 +131,21 @@ namespace Warden.Networking.Tcp
 
         internal void OnConnectionOpenedInternal(TcpConnection tcpConnection)
         {
+            Logger.Debug($"Connection {tcpConnection} opened!");
+
             configuration.SynchronizeSafe(() =>
             {
                 ConnectionOpenedEventArgs args = new ConnectionOpenedEventArgs(tcpConnection);
+                try
+                {
+                    args.Connection.OnConnectionOpened(args);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(
+                        $"Unhandled exception on {args.Connection.GetType().Name}.{nameof(OnConnectionOpened)}: {ex}");
+                }
+
                 try
                 {
                     OnConnectionOpened(args);
@@ -147,11 +161,12 @@ namespace Warden.Networking.Tcp
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnConnectionOpenedEvent)}: {ex}");
+                    Logger.Error(
+                        $"Unhandled exception on {this.GetType().Name}.{nameof(OnConnectionOpenedEvent)}: {ex}");
                 }
             }, this.Logger);
         }
-
+        
         protected virtual void OnConnectionClosed(ConnectionClosedEventArgs args)
         {
 

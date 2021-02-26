@@ -1,12 +1,15 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
 using Warden.Logging;
+using Warden.Networking.Cryptography;
 using Warden.Util.Buffers;
 
 namespace Warden.Networking.Tcp
 {
-    public abstract class TcpPeerConfiguration
+    public abstract class TcpConfigurationPeer
     {
         public ConnectionSimulation ConnectionSimulation { get => connectionSimulation; set { CheckLocked(); connectionSimulation = value; } }
         public LingerOption LingerOption { get => lingerOption; set { CheckLocked(); CheckNull(value); lingerOption = value; } }
@@ -14,6 +17,7 @@ namespace Warden.Networking.Tcp
         public bool ReuseAddress { get => reuseAddress; set { CheckLocked(); reuseAddress = value; } }
         public MemoryStreamPool MemoryStreamPool { get => memoryStreamPool; set { CheckLocked(); CheckNull(value); memoryStreamPool = value; } }
         public int BufferSize { get => bufferSize; set { CheckLocked(); bufferSize = value; } }
+        public int MaxStashedConnections { get => maxStashedConnections; set { CheckLocked(); maxStashedConnections = value; } }
         public ILogManager LogManager { get => logManager; set { CheckLocked(); CheckNull(value); logManager = value; } }
 
         public bool KeepAliveEnabled { get => keepAliveEnabled; set { CheckLocked(); keepAliveEnabled = value; } }
@@ -26,6 +30,7 @@ namespace Warden.Networking.Tcp
 
         protected int bufferSize;
         protected bool noDelay;
+        protected int maxStashedConnections;
         protected MemoryStreamPool memoryStreamPool;
         protected LingerOption lingerOption;
         protected ILogManager logManager;
@@ -79,7 +84,7 @@ namespace Warden.Networking.Tcp
                 callback, logger);
         }
 
-        public TcpPeerConfiguration()
+        public TcpConfigurationPeer()
         {
             syncronizationContext = new SynchronizationContext();
             contextSynchronizationMode = ContextSynchronizationMode.Send;
@@ -89,7 +94,7 @@ namespace Warden.Networking.Tcp
             noDelay = true;
             logManager = Logging.LogManager.Dummy;
             lingerOption = new LingerOption(true, 15);
-
+            maxStashedConnections = 128;
             keepAliveEnabled = true;
             keepAliveInterval = 1000;
             keepAliveTimeout = Timeout.Infinite;

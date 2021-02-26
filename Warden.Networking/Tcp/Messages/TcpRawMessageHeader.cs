@@ -6,9 +6,9 @@ namespace Warden.Networking.Tcp.Messages
     {
         None = 0,
         KeepAliveRequest = 1,
-        KeepAliveResponse = 2
-            //4
-            //8
+        KeepAliveResponse = 2,
+            //16
+            //32
     }
 
     class TcpRawMessageHeader

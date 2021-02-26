@@ -9,9 +9,8 @@ using Warden.Rpc.Payload;
 
 namespace Warden.Rpc.Net.Udp
 {
-    public class RpcUdpConnection : UdpConnection, IRpcConnectionUdp
+    public class RpcUdpConnection : UdpConnection, IRpcConnectionAdvancedDelivery
     {
-        public object Tag { get; set; }
         public EndPoint RemoteEndpoint => base.EndPoint.EndPoint;
 
         RpcUdpServerConfiguration configuration;
@@ -45,8 +44,8 @@ namespace Warden.Rpc.Net.Udp
         public void CreateSession()
         {
             var session = configuration.SessionFactory.CreateSession(CreateContext());
-            session.Initialize();
-            this.session = this.session;
+            session.InitializeRemotingObject(session);
+            this.session = session;
         }
 
         public bool SendReliable(ICustomMessage message)

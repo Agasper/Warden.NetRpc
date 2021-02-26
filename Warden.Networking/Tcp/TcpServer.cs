@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using Warden.Logging;
 
 namespace Warden.Networking.Tcp
@@ -23,11 +24,11 @@ namespace Warden.Networking.Tcp
         ILogger logger;
         ConcurrentDictionary<long, TcpConnection> connections;
         Socket serverSocket;
-        new TcpServerConfiguration configuration;
+        new TcpConfigurationServer configuration;
         long connectionId = 0;
         bool listening;
 
-        public TcpServer(TcpServerConfiguration configuration) : base(configuration)
+        public TcpServer(TcpConfigurationServer configuration) : base(configuration)
         {
             if (configuration.AcceptThreads < 1 || configuration.AcceptThreads > 10)
                 throw new ArgumentOutOfRangeException($"{nameof(configuration.AcceptThreads)} should be in range 1-10");
@@ -145,6 +146,7 @@ namespace Warden.Networking.Tcp
                     connSocket.Close();
                     return;
                 }
+
                 if (connections.Count >= configuration.MaximumConnections)
                 {
                     connSocket.Close();
@@ -167,8 +169,6 @@ namespace Warden.Networking.Tcp
                 }
 
                 connection.StartReceive();
-
-                this.OnConnectionOpenedInternal(connection);
             }
             catch (ObjectDisposedException)
             {

@@ -5,6 +5,8 @@ namespace Warden.Rpc.Payload
     {
         RpcRequest = 1,
         RpcResponse = 2,
-        RpcResponseError = 3
+        RpcResponseError = 3,
+        AuthenticateRequest = 4,
+        AuthenticateResponse = 5
     }
 }

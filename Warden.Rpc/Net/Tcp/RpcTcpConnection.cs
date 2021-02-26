@@ -1,56 +1,96 @@
 ﻿using System;
+using System.Net;
+using System.Threading.Tasks;
 using Warden.Networking.IO;
 using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
 using Warden.Networking.Tcp.Messages;
 using Warden.Rpc;
+using Warden.Rpc.Net.Tcp.Events;
+using Warden.Rpc.Net.Udp;
+
 //using static Warden.Rpc.Net.Tcp.RpcTcpServer;
 
 namespace Warden.Rpc.Net.Tcp
 {
-    //public class RpcTcpConnection : TcpConnection, IRpcConnection
-    //{
-    //    RpcTcpSession session;
-    //    RpcSerializer serializer;
-    //    RpcTcpServerConfiguration configuration;
+    public class RpcTcpConnection : TcpConnection, IRpcConnection
+    {
+        public RpcSession Session => session;
+        
+        RpcTcpConfiguration configuration;
+        RpcSession session;
+        IRpcPeerEventListener eventListener;
 
-    //    internal RpcTcpConnection(InnerTcpServer parent, RpcTcpServerConfiguration configuration) : base(parent)
-    //    {
-    //        this.configuration = configuration;
+        internal RpcTcpConnection(TcpPeer parent, IRpcPeerEventListener eventListener, RpcTcpConfiguration configuration) : base(parent)
+        {
+            this.configuration = configuration;
+            this.eventListener = eventListener;
+        }
 
-    //        RpcConfiguration rpcConfiguration = new RpcConfiguration();
-    //        rpcConfiguration.Connection = this;
-    //        rpcConfiguration.DefaultExecutionTimeout = configuration.DefaultExecutionTimeout;
-    //        rpcConfiguration.OrderedExecution = configuration.OrderedExecution;
-    //        rpcConfiguration.OrderedExecutionMaxQueue = configuration.OrderedExecutionMaxQueue;
-    //        rpcConfiguration.Serializer = configuration.Serializer;
-    //        serializer = configuration.Serializer;
-    //        var obj = configuration.SessionFactory.CreateSession(this);
-    //        session = new RpcTcpSession(obj, rpcConfiguration);
-    //    }
+        protected internal virtual void CreateSession()
+        {
+            var session_ = configuration.SessionFactory.CreateSession(CreateContext());
+            session_.InitializeRemotingObject(session);
+            this.session = session_;
+            
+            eventListener.OnSessionOpened(new SessionOpenedEventArgs(session_, this));
+        }
 
-    //    public void SendMessage(ICustomMessage message, SendingOptions sendingOptions)
-    //    {
-    //        TcpRawMessage rawMessage = Parent.CreateMessage();
-    //        using (WardenStreamWriter sw = new WardenStreamWriter(rawMessage.BaseStream, true))
-    //        {
-    //            message.WriteTo(new WriteFormatterInfo(sw, serializer));
-    //        }
+        RpcSessionContext CreateContext()
+        {
+            RpcSessionContext result = new RpcSessionContext();
+            result.Connection = this;
+            result.Serializer = configuration.Serializer;
+            result.LogManager = configuration.LogManager;
+            result.TaskScheduler = configuration.TaskScheduler;
+            result.OrderedExecution = configuration.OrderedExecution;
+            result.DefaultExecutionTimeout = configuration.DefaultExecutionTimeout;
+            result.OrderedExecutionMaxQueue = configuration.OrderedExecutionMaxQueue;
 
-    //        this.SendMessageAsync(rawMessage);
-    //    }
+            return result;
+        }
 
-    //    public void SendMessage(ICustomMessage message)
-    //    {
-    //        this.SendMessage(message, SendingOptions.Default);
-    //    }
+        protected override void OnConnectionClosed(ConnectionClosedEventArgs args)
+        {
+            base.OnConnectionClosed(args);
+            if (this.session != null)
+            {
+                this.session?.Close();
+                eventListener.OnSessionClosed(new SessionClosedEventArgs(this.session, this));
+            }
+        }
 
-    //    protected override void OnMessageReceived(MessageEventArgs args)
-    //    {
-    //        using (WardenStreamReader reader = new WardenStreamReader(args.Message.BaseStream, false))
-    //        {
-    //            session.OnMessage(reader);
-    //        }
-    //    }
-    //}
+        protected override void OnMessageReceived(MessageEventArgs args)
+        {
+            using (args.Message)
+            {
+                using (WardenStreamReader sr = new WardenStreamReader(args.Message.BaseStream, true))
+                {
+                    session.OnMessage(sr);
+                }
+            }
+            
+            base.OnMessageReceived(args);
+        }
+
+        public bool SendReliable(ICustomMessage message)
+        {
+            if (!this.Connected)
+                return false;
+            
+            TcpRawMessage rawMessage = Parent.CreateMessage();
+            using (WardenStreamWriter sw = new WardenStreamWriter(rawMessage.BaseStream, true))
+            {
+                message.WriteTo(new WriteFormatterInfo(sw, configuration.Serializer));
+            }
+            
+            SendRawMessage(rawMessage);
+            return true;
+        }
+
+        protected virtual void SendRawMessage(TcpRawMessage message)
+        {
+            _ = this.SendMessageAsync(message);
+        }
+    }
 }

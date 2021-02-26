@@ -6,11 +6,11 @@ namespace Warden.Rpc.Net.Udp
 {
     public class RpcUdpServer
     {
-        class UdpServerOverride : UdpServer
+        class InnerUdpServer : UdpServer
         {
             RpcUdpServerConfiguration configuration;
 
-            public UdpServerOverride(RpcUdpServerConfiguration configuration) : base(configuration)
+            public InnerUdpServer(RpcUdpServerConfiguration configuration) : base(configuration)
             {
                 this.configuration = configuration;
             }
@@ -23,7 +23,9 @@ namespace Warden.Rpc.Net.Udp
             }
         }
 
-        UdpServerOverride udpServer;
+        public RpcUdpServerConfiguration Configuration => configuration;
+
+        InnerUdpServer innerUdpServer;
         RpcUdpServerConfiguration configuration;
 
         public RpcUdpServer(RpcUdpServerConfiguration configuration)
@@ -33,32 +35,32 @@ namespace Warden.Rpc.Net.Udp
             if (configuration.SessionFactory == null)
                 throw new ArgumentNullException(nameof(configuration.Serializer));
             this.configuration = configuration;
-            this.udpServer = new UdpServerOverride(configuration);
+            this.innerUdpServer = new InnerUdpServer(configuration);
         }
 
         public void Start()
         {
-            this.udpServer.Start();
+            this.innerUdpServer.Start();
         }
 
         public void Shutdown()
         {
-            this.udpServer.Shutdown();
+            this.innerUdpServer.Shutdown();
         }
 
         public void Listen(int port)
         {
-            this.udpServer.Listen(port);
+            this.innerUdpServer.Listen(port);
         }
 
         public void Listen(IPEndPoint endpoint)
         {
-            this.udpServer.Listen(endpoint);
+            this.innerUdpServer.Listen(endpoint);
         }
 
         public void Listen(string ip, int port)
         {
-            this.udpServer.Listen(ip, port);
+            this.innerUdpServer.Listen(ip, port);
         }
     }
 }

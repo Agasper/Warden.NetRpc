@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System;
 using System.Net;
+using System.Threading.Tasks;
 using Warden.Logging;
 using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
@@ -9,13 +8,13 @@ using Warden.Rpc.Net.Tcp.Events;
 
 namespace Warden.Rpc.Net.Tcp
 {
-    public abstract class RpcTcpServer : IRpcPeerEventListener
+    public class RpcTcpClient : IRpcPeerEventListener
     {
-        internal class InnerTcpServer : TcpServer
+        internal class InnerTcpClient : TcpClient
         {
-            RpcTcpServer parent;
+            RpcTcpClient parent;
 
-            public InnerTcpServer(RpcTcpServer parent, RpcTcpConfigurationServer configuration) : base(configuration.TcpConfiguration)
+            public InnerTcpClient(RpcTcpClient parent, RpcTcpConfigurationClient configuration) : base(configuration.TcpConfiguration)
             {
                 this.parent = parent;
             }
@@ -29,19 +28,21 @@ namespace Warden.Rpc.Net.Tcp
             {
                 parent.OnConnectionClosedInternal(args);
                 base.OnConnectionClosed(args);
-                args.Connection.Stash();
             }
         }
-
+        
+        public RpcTcpConfigurationClient Configuration => configuration;
+        public RpcSession Session { get; private set; }
+        public bool Ready => Session != null;
         public event DOnSessionOpened OnSessionOpenedEvent;
         public event DOnSessionClosed OnSessionClosedEvent;
-        public RpcTcpConfigurationServer Configuration => configuration;
-
-        InnerTcpServer innerTcpServer;
-        RpcTcpConfigurationServer configuration;
+        
+        InnerTcpClient innerTcpClient;
+        RpcTcpConfigurationClient configuration;
         ILogger logger;
+        TaskCompletionSource<object> tcsSessionReady;
 
-        public RpcTcpServer(RpcTcpConfigurationServer configuration)
+        public RpcTcpClient(RpcTcpConfigurationClient configuration)
         {
             if (configuration.Serializer == null)
                 throw new ArgumentNullException(nameof(configuration.Serializer));
@@ -49,83 +50,80 @@ namespace Warden.Rpc.Net.Tcp
                 throw new ArgumentNullException(nameof(configuration.Serializer));
             configuration.Lock();
             this.configuration = configuration;
-            this.innerTcpServer = new InnerTcpServer(this, configuration);
+            this.innerTcpClient = new InnerTcpClient(this, configuration);
             this.logger = configuration.LogManager.GetLogger(nameof(RpcTcpServer));
             this.logger.Meta["kind"] = this.GetType().Name;
         }
-
-        public int SessionsCount => innerTcpServer.Connections.Count;
-
-        public IEnumerable<RpcSession> Sessions
-        {
-            get
-            {
-                foreach (var connection in innerTcpServer.Connections.Values)
-                {
-                    var session = (connection as RpcTcpConnection)?.Session;
-                    if (session != null)
-                        yield return session;
-                }
-            }
-        }
-
+        
         public void Start()
         {
-            innerTcpServer.Start();
+            innerTcpClient.Start();
         }
         
         public void Shutdown()
         {
-            innerTcpServer.Shutdown();
-        }
-        
-        public void Listen(int port)
-        {
-            innerTcpServer.Listen(port);
+            innerTcpClient.Shutdown();
         }
 
-        public void Listen(string host, int port)
+        public async Task StartSession(string host, int port)
         {
-            innerTcpServer.Listen(host, port);
+            this.tcsSessionReady = new TaskCompletionSource<object>();
+            
+            await innerTcpClient.ConnectAsync(host, port)
+                .ConfigureAwait(false);
+            await tcsSessionReady.Task
+                .ConfigureAwait(false);
         }
 
-        public void Listen(IPEndPoint endPoint)
+        public async Task StartSession(IPEndPoint endpoint)
         {
-            innerTcpServer.Listen(endPoint);
+            this.tcsSessionReady = new TaskCompletionSource<object>();
+            
+            await innerTcpClient.ConnectAsync(endpoint)
+                .ConfigureAwait(false);
+            await tcsSessionReady.Task
+                .ConfigureAwait(false);
         }
 
-        internal virtual RpcTcpConnection CreateConnection()
+        public void CloseSession()
+        {
+            innerTcpClient.Disconnect();
+        }
+
+        protected internal virtual RpcTcpConnection CreateConnection()
         {
             RpcTcpConnection connection = null;
             if (configuration.Cipher != null)
             {
                 RpcTcpConnectionEncrypted encryptedConnection =
-                    new RpcTcpConnectionEncrypted(innerTcpServer, configuration.Cipher, this, configuration);
+                    new RpcTcpConnectionEncrypted(innerTcpClient, configuration.Cipher, this, configuration);
                 encryptedConnection.SendHandshake();
                 connection = encryptedConnection;
             }
             else
             {
-                connection = new RpcTcpConnection(innerTcpServer, this, configuration);
+                connection = new RpcTcpConnection(innerTcpClient, this, configuration);
                 connection.CreateSession();
             }
 
             return connection;
         }
 
-        
         internal void OnConnectionClosedInternal(ConnectionClosedEventArgs args)
+        {
+            tcsSessionReady?.TrySetException(new InvalidOperationException("Connection closed prematurely"));
+        }
+
+        void OnSessionOpened(SessionOpenedEventArgs args)
         {
             
         }
-
-        protected virtual void OnSessionOpened(SessionOpenedEventArgs args)
-        {
-
-        }
-
+        
         void IRpcPeerEventListener.OnSessionOpened(SessionOpenedEventArgs args)
         {
+            this.Session = args.Session;
+            tcsSessionReady?.TrySetResult(null);
+            
             try
             {
                 OnSessionOpened(args);
@@ -146,13 +144,15 @@ namespace Warden.Rpc.Net.Tcp
 
         }
 
-        protected virtual void OnSessionClosed(SessionClosedEventArgs args)
+        void OnSessionClosed(SessionClosedEventArgs args)
         {
             
         }
         
         void IRpcPeerEventListener.OnSessionClosed(SessionClosedEventArgs args)
         {
+            this.Session = null;
+            
             try
             {
                 OnSessionClosed(args);

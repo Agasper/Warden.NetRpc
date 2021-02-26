@@ -10,14 +10,10 @@ namespace Warden.Rpc
         public bool OrderedExecution { get; set; }
         public int OrderedExecutionMaxQueue { get; set; }
         public RpcSerializer Serializer { get; set; }
-        public ILogManager LogManager { get; set; }
         public TaskScheduler TaskScheduler { get; set; }
-        public IRpcConnectionTcp Connection { get; set; }
-
-        public bool AllowAsync { get; set; } = true;
-        public bool AllowNonVoid { get; set; } = true;
-        public bool DontUseLambdaExpressions { get; set; } = false;
-        public bool OnlyPublicMethods { get; set; } = true;
+        public ILogManager LogManager { get; set; }
+        public IRpcConnection Connection { get; set; }
+        public RemotingObjectConfiguration RemotingObjectConfiguration { get; set; } = new RemotingObjectConfiguration();
 
         public RpcSessionContext()
         {

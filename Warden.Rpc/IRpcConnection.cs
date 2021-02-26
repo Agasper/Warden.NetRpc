@@ -6,7 +6,7 @@ using Warden.Rpc.Payload;
 
 namespace Warden.Rpc
 {
-    public interface IRpcConnectionTcp
+    public interface IRpcConnection
     {
         object Tag { get; }
         EndPoint RemoteEndpoint { get; }
@@ -14,7 +14,7 @@ namespace Warden.Rpc
         void Close();
     }
     
-    public interface IRpcConnectionUdp : IRpcConnectionTcp
+    public interface IRpcConnectionAdvancedDelivery : IRpcConnection
     {
         bool SendCustom(ICustomMessage message, DeliveryType deliveryType, int channel);
     }

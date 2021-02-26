@@ -37,7 +37,7 @@ namespace Warden.Rpc.Payload
         public RemotingException(Exception exception) : base(exception.Message, exception)
         {
             this.remoteStackTrace = exception.StackTrace;
-            this.remoteType = exception.GetType().Name;
+            this.remoteType = exception.GetType().FullName;
         }
 
         public RemotingException(string message, string exceptionType, string stackTrace) : base(message)

@@ -20,66 +20,82 @@ namespace Warden.Rpc
         public int DefaultExecutionTimeout => defaultExecutionTimeout;
         public bool OrderedExecution => orderedExecution;
         public int OrderedExecutionMaxQueue => orderedExecutionMaxQueue;
-        public IRpcConnectionTcp Connection { get; private set; }
+        public IRpcConnection Connection { get; private set; }
 
         readonly ConcurrentDictionary<uint, RemotingRequest> requests;
         readonly RpcSerializer rpcSerializer;
+        readonly RemotingObjectConfiguration remotingObjectConfiguration;
         readonly bool orderedExecution;
         readonly int defaultExecutionTimeout;
         readonly int orderedExecutionMaxQueue;
+
         readonly object orderedExecutionTaskMutex = new object();
         readonly object lastRequestIdMutex = new object();
-        readonly ILogger logger;
+        readonly protected internal ILogger logger;
         readonly TaskScheduler taskScheduler;
-
+        
         Task orderedExecutionTask;
         uint lastRequestId;
         volatile int executionQueueSize;
         volatile bool closed;
         object requestsMutex = new object();
         
-        RemotingObjectScheme remotingObjectScheme;
-        object remotingObject;
+        protected RemotingObjectScheme remotingObjectScheme;
+        protected object remotingObject;
 
-        public RpcSession(RpcSessionContext context)
+        public RpcSession(RpcSessionContext sessionContext)
         {
-            if (context.Serializer == null)
-                throw new ArgumentNullException(nameof(context.Serializer));
-            if (context.Connection == null)
-                throw new ArgumentNullException(nameof(context.Connection));
-            if (context.LogManager == null)
-                throw new ArgumentNullException(nameof(context.LogManager));
-            if (context.TaskScheduler == null)
-                throw new ArgumentNullException(nameof(context.TaskScheduler));
+            if (sessionContext.Serializer == null)
+                throw new ArgumentNullException(nameof(sessionContext.Serializer));
+            if (sessionContext.Connection == null)
+                throw new ArgumentNullException(nameof(sessionContext.Connection));
+            if (sessionContext.LogManager == null)
+                throw new ArgumentNullException(nameof(sessionContext.LogManager));
+            if (sessionContext.TaskScheduler == null)
+                throw new ArgumentNullException(nameof(sessionContext.TaskScheduler));
+            if (sessionContext.RemotingObjectConfiguration == null)
+                throw new ArgumentNullException(nameof(sessionContext.RemotingObjectConfiguration));
             
             this.requests = new ConcurrentDictionary<uint, RemotingRequest>();
-            this.rpcSerializer = context.Serializer;
-            this.orderedExecution = context.OrderedExecution;
+            this.rpcSerializer = sessionContext.Serializer;
+            this.orderedExecution = sessionContext.OrderedExecution;
             this.orderedExecutionTask = Task.CompletedTask;
-            this.orderedExecutionMaxQueue = context.OrderedExecutionMaxQueue;
-            this.taskScheduler = context.TaskScheduler;
-            this.Connection = context.Connection;
-            this.defaultExecutionTimeout = context.DefaultExecutionTimeout;
-            this.logger = context.LogManager.GetLogger(nameof(RpcSession));
+            this.orderedExecutionMaxQueue = sessionContext.OrderedExecutionMaxQueue;
+            this.remotingObjectConfiguration = sessionContext.RemotingObjectConfiguration;
+            this.taskScheduler = sessionContext.TaskScheduler;
+            this.Connection = sessionContext.Connection;
+            this.defaultExecutionTimeout = sessionContext.DefaultExecutionTimeout;
+            this.logger = sessionContext.LogManager.GetLogger(nameof(RpcSession));
             this.logger.Meta["kind"] = this.GetType().Name;
         }
 
-        internal void Initialize()
+
+        public void MergeFrom(ReadFormatterInfo readFormatterInfo)
         {
-            this.remotingObject = this.InitializeRemotingObject();
-            RemotingObjectConfiguration configuration = new RemotingObjectConfiguration();
-            remotingObjectScheme = new RemotingObjectScheme();
+            
         }
 
-        protected virtual object InitializeRemotingObject()
+        public virtual void InitializeRemotingObject(object obj)
         {
-            return this;
+            if (obj == null)
+                throw new ArgumentNullException(nameof(obj));
+            this.remotingObject = obj;
+            this.remotingObjectScheme = new RemotingObjectScheme(this.remotingObjectConfiguration, obj.GetType());
         }
 
-        public virtual bool Close()
+        public virtual void DeleteRemotingObject()
+        {
+            this.remotingObject = null;
+            this.remotingObjectScheme = null;
+        }
+
+        public bool Close()
         {
             if (closed)
                 return false;
+            
+            Connection.Close();
+            
             closed = true;
 
             lock (requestsMutex)
@@ -92,54 +108,87 @@ namespace Warden.Rpc
                 requests.Clear();
             }
 
+            this.remotingObject = null;
+            this.remotingObjectScheme = null;
+
             this.logger.Debug($"{this} closed!");
+            
+            try
+            {
+                OnClose();
+            }
+            catch (Exception e)
+            {
+                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnClose)}: {e}");
+            }
+            
             return true;
+        }
+
+        protected virtual void OnClose()
+        {
+            
         }
 
         protected void CheckClosed()
         {
             if (closed)
-                throw new ObjectDisposedException(nameof(RpcSession));
+                throw new InvalidOperationException($"{nameof(RpcSession)} already closed");
+        }
+
+        internal virtual void OnExtraMessage(MessageType messageType, ReadFormatterInfo readFormatterInfo)
+        {
+            throw new ArgumentException($"Wrong message type: {messageType}");
         }
 
         public void OnMessage(IReader reader)
         {
-            CheckClosed();
-            MessageType messageType = (MessageType)reader.ReadByte();
-            ReadFormatterInfo readFormatterInfo = new ReadFormatterInfo(reader, rpcSerializer);
-            switch (messageType)
+            try
             {
-                case MessageType.RpcRequest:
-                    RemotingRequest remotingRequest = new RemotingRequest();
-                    remotingRequest.MergeFrom(readFormatterInfo);
-                    LogMessageReceived(remotingRequest);
-                    ExecuteRequest(remotingRequest);
-                    break;
-                case MessageType.RpcResponse:
-                    RemotingResponse remotingResponse = new RemotingResponse();
-                    remotingResponse.MergeFrom(readFormatterInfo);
-                    LogMessageReceived(remotingResponse);
-                    ExecuteResponse(remotingResponse);
-                    break;
-                case MessageType.RpcResponseError:
-                    RemotingResponseError remotingResponseError = new RemotingResponseError();
-                    remotingResponseError.MergeFrom(readFormatterInfo);
-                    LogMessageReceived(remotingResponseError);
-                    ExecuteResponseError(remotingResponseError);
-                    break;
-                default:
-                    throw new ArgumentException($"Wrong message type: {messageType}");
+                CheckClosed();
+                MessageType messageType = (MessageType) reader.ReadByte();
+                ReadFormatterInfo readFormatterInfo = new ReadFormatterInfo(reader, rpcSerializer);
+                switch (messageType)
+                {
+                    case MessageType.RpcRequest:
+                        RemotingRequest remotingRequest = new RemotingRequest();
+                        remotingRequest.MergeFrom(readFormatterInfo);
+                        LogMessageReceived(remotingRequest);
+                        EnqueueRequest(remotingRequest);
+                        break;
+                    case MessageType.RpcResponse:
+                        RemotingResponse remotingResponse = new RemotingResponse();
+                        remotingResponse.MergeFrom(readFormatterInfo);
+                        LogMessageReceived(remotingResponse);
+                        ExecuteResponse(remotingResponse);
+                        break;
+                    case MessageType.RpcResponseError:
+                        RemotingResponseError remotingResponseError = new RemotingResponseError();
+                        remotingResponseError.MergeFrom(readFormatterInfo);
+                        LogMessageReceived(remotingResponseError);
+                        ExecuteResponseError(remotingResponseError);
+                        break;
+                    default:
+                        OnExtraMessage(messageType, readFormatterInfo);
+                        break;
+                }
+            }
+            catch (Exception outerException)
+            {
+                logger.Error($"Closing connection due to unhandled exception on {this.GetType().Name}.{nameof(OnMessage)}(): {outerException}");
+                Connection.Close();
             }
         }
 
-        void LogMessageReceived(ICustomMessage message)
+
+        protected internal void LogMessageReceived(ICustomMessage message)
         {
             this.logger.Trace($"{this} received {message}");
         }
 
         public override string ToString()
         {
-            return $"{nameof(RpcSession)}[connection={Connection},tag={Tag}]";
+            return $"{nameof(RpcSession)}[connection={Connection},tag={Tag},closed={closed}]";
         }
 
         void ExecuteResponseError(RemotingResponseError remotingResponseError)
@@ -162,7 +211,7 @@ namespace Warden.Rpc
             }
         }
 
-        void ExecuteRequest(RemotingRequest request)
+        void EnqueueRequest(RemotingRequest request)
         {
             if (orderedExecution && executionQueueSize >= orderedExecutionMaxQueue)
             {
@@ -172,7 +221,7 @@ namespace Warden.Rpc
 
             if (!orderedExecution)
             {
-                Task.Factory.StartNew(() => ExecuteRequestOuterAsync(request), 
+                Task.Factory.StartNew(() => ExecuteRequestInternalAsync(request), 
                     default, TaskCreationOptions.None,
                     taskScheduler ?? TaskScheduler.Default);
             }
@@ -182,45 +231,38 @@ namespace Warden.Rpc
                 {
                     Interlocked.Increment(ref executionQueueSize);
                     orderedExecutionTask = orderedExecutionTask.ContinueWith((t, o)
-                        => ExecuteRequestOuterAsync(o as RemotingRequest), request,
+                        => ExecuteRequestInternalAsync(o as RemotingRequest), request,
                             default,
                             TaskContinuationOptions.None,
                             taskScheduler ?? TaskScheduler.Default).Unwrap();
                 }
             }
         }
-
-        async Task ExecuteRequestOuterAsync(RemotingRequest request)
+        
+        async Task ExecuteRequestInternalAsync(RemotingRequest request)
         {
-            if (this.closed)
-            {
-                logger.Debug($"Dropping incoming request {request}, connection already closed");
-                return;
-            }
-            
             try
             {
+                if (this.closed)
+                {
+                    logger.Debug($"Dropping incoming request {request}, connection already closed");
+                    return;
+                }
+
                 logger.Debug($"Executing {request} locally");
-                
-                try
-                {
-                    LocalExecutionStartingEventArgs eventArgs = new LocalExecutionStartingEventArgs(request);
-                    OnLocalExecutionStarting(eventArgs);
-                }
-                catch (Exception ex)
-                {
-                    logger.Error($"{this} got an unhandled exception in {nameof(OnLocalExecutionStarting)}(): {ex}");
-                }
+
+                LocalExecutionStartingEventArgs eventArgsStarting = new LocalExecutionStartingEventArgs(request);
+                OnLocalExecutionStarting(eventArgsStarting);
 
                 Stopwatch sw = new Stopwatch();
                 sw.Start();
-                var result = await ExecuteRequestAsync(request).ConfigureAwait(false);
+                var result = await ExecuteRequestAsync(new ExecutionRequest(request)).ConfigureAwait(false);
                 sw.Stop();
-                
 
-                double timeSeconds = sw.ElapsedTicks / (double)Stopwatch.Frequency;
-                ulong timeSpanTicks = (ulong)(timeSeconds * TimeSpan.TicksPerSecond);
-                float ms = timeSpanTicks / (float)TimeSpan.TicksPerMillisecond;
+
+                double timeSeconds = sw.ElapsedTicks / (double) Stopwatch.Frequency;
+                ulong timeSpanTicks = (ulong) (timeSeconds * TimeSpan.TicksPerSecond);
+                float ms = timeSpanTicks / (float) TimeSpan.TicksPerMillisecond;
                 logger.Debug($"Executed {request} locally in {ms.ToString("0.00")}ms");
 
                 RemotingResponse response = null;
@@ -233,16 +275,10 @@ namespace Warden.Rpc
                     response.ExecutionTime = timeSpanTicks;
                 }
                 
-                try
-                {
-                    LocalExecutionCompletedEventArgs eventArgs = new LocalExecutionCompletedEventArgs(request, response, ms);
-                    OnLocalExecutionCompleted(eventArgs);
-                }
-                catch (Exception ex)
-                {
-                    logger.Error($"{this} got an unhandled exception in {nameof(OnLocalExecutionCompleted)}(): {ex}");
-                }
-                
+                LocalExecutionCompletedEventArgs eventArgsCompleted =
+                    new LocalExecutionCompletedEventArgs(request, response, ms);
+                OnLocalExecutionCompleted(eventArgsCompleted);
+
                 if (response != null)
                     SendMessage(response);
             }
@@ -325,27 +361,35 @@ namespace Warden.Rpc
 
         }
 
-        protected virtual Task<ExecutionResult> ExecuteRequestAsync(RemotingRequest request)
+        protected virtual void OnSessionReady()
         {
-            if (remotingObjectScheme == null || UserSession == null)
-                throw new InvalidOperationException("User session isn't started or already destroyed. Can't execute method");
+            
+        }
+
+        internal void SetReady()
+        {
+            OnSessionReady();
+        }
+
+        protected virtual async Task<ExecutionResult> ExecuteRequestAsync(ExecutionRequest request)
+        {
+            if (remotingObjectScheme == null || remotingObject == null)
+                throw new NullReferenceException("RpcSession isn't initialized properly. Remoting object is null");
 
             var container = remotingObjectScheme.GetInvocationContainer(request.MethodKey);
 
             object result = null;
             if (request.HasArgument)
-                result = await container.InvokeAsync(UserSession, request.Argument).ConfigureAwait(false);
+                result = await container.InvokeAsync(remotingObject, request.Argument).ConfigureAwait(false);
             else
-                result = await container.InvokeAsync(UserSession).ConfigureAwait(false);
+                result = await container.InvokeAsync(remotingObject).ConfigureAwait(false);
 
-            ExecutionResult executionResult = new ExecutionResult();
-            executionResult.HasResult = container.DoesReturnValue;
-            executionResult.Result = result;
+            ExecutionResult executionResult = new ExecutionResult(container.DoesReturnValue, result);
 
             return executionResult;
         }
 
-        RemotingRequest GetRequest(object methodIdentity, bool expectResponse)
+        protected internal RemotingRequest GetRequest(object methodIdentity, bool expectResponse)
         {
             if (!(methodIdentity is int || methodIdentity is string))
                 throw new ArgumentException($"{nameof(methodIdentity)} should be int or string");
@@ -378,7 +422,7 @@ namespace Warden.Rpc
             return executionTask;
         }
 
-        void SendMessage(ICustomMessage message)
+        protected internal void SendMessage(ICustomMessage message)
         {
             this.logger.Trace($"{this} sending {message}");
             if (!this.Connection.SendReliable(message))
@@ -412,51 +456,55 @@ namespace Warden.Rpc
             }
         }
         
-        public virtual Task ExecuteAsync(int methodIdentity) => ExecuteAsync_(methodIdentity, ExecutionOptions.Default);
-        public virtual Task ExecuteAsync(string methodIdentity) => ExecuteAsync_(methodIdentity, ExecutionOptions.Default);
-        public virtual Task ExecuteAsync(int methodIdentity, ExecutionOptions options) => ExecuteAsync_(methodIdentity, options);
-        public virtual Task ExecuteAsync(string methodIdentity, ExecutionOptions options) => ExecuteAsync_(methodIdentity, options);
+        public virtual Task ExecuteAsync(int methodIdentity) => ExecuteAsyncInternal(methodIdentity, ExecutionOptions.Default);
+        public virtual Task ExecuteAsync(string methodIdentity) => ExecuteAsyncInternal(methodIdentity, ExecutionOptions.Default);
+        public virtual Task ExecuteAsync(int methodIdentity, ExecutionOptions options) => ExecuteAsyncInternal(methodIdentity, options);
+        public virtual Task ExecuteAsync(string methodIdentity, ExecutionOptions options) => ExecuteAsyncInternal(methodIdentity, options);
 
-        Task ExecuteAsync_(object methodIdentity, ExecutionOptions options)
+        Task ExecuteAsyncInternal(object methodIdentity, ExecutionOptions options)
         {
+            CheckClosed();
             RemotingRequest request = GetRequest(methodIdentity, true);
             request.HasArgument = false;
             return SendAndWait(request, options);
         }
 
-        public virtual Task ExecuteAsync<A>(int methodIdentity, A arg) => ExecuteAsync_(methodIdentity, arg, ExecutionOptions.Default);
-        public virtual Task ExecuteAsync<A>(string methodIdentity, A arg) => ExecuteAsync_(methodIdentity, arg, ExecutionOptions.Default);
-        public virtual Task ExecuteAsync<A>(int methodIdentity, A arg, ExecutionOptions options) => ExecuteAsync_(methodIdentity, arg, options);
-        public virtual Task ExecuteAsync<A>(string methodIdentity, A arg, ExecutionOptions options) => ExecuteAsync_(methodIdentity, arg, options);
+        public virtual Task ExecuteAsync<A>(int methodIdentity, A arg) => ExecuteAsyncInternal(methodIdentity, arg, ExecutionOptions.Default);
+        public virtual Task ExecuteAsync<A>(string methodIdentity, A arg) => ExecuteAsyncInternal(methodIdentity, arg, ExecutionOptions.Default);
+        public virtual Task ExecuteAsync<A>(int methodIdentity, A arg, ExecutionOptions options) => ExecuteAsyncInternal(methodIdentity, arg, options);
+        public virtual Task ExecuteAsync<A>(string methodIdentity, A arg, ExecutionOptions options) => ExecuteAsyncInternal(methodIdentity, arg, options);
 
-        Task ExecuteAsync_<A>(object methodIdentity, A arg, ExecutionOptions options)
+        Task ExecuteAsyncInternal<A>(object methodIdentity, A arg, ExecutionOptions options)
         {
+            CheckClosed();
             RemotingRequest request = GetRequest(methodIdentity, true);
             request.HasArgument = true;
             request.Argument = arg;
             return SendAndWait(request, options);
         }
 
-        public virtual Task<R> ExecuteAsync<R>(int methodIdentity) => ExecuteAsync_<R>(methodIdentity, ExecutionOptions.Default);
-        public virtual Task<R> ExecuteAsync<R>(string methodIdentity) => ExecuteAsync_<R>(methodIdentity, ExecutionOptions.Default);
-        public virtual Task<R> ExecuteAsync<R>(int methodIdentity, ExecutionOptions options) => ExecuteAsync_<R>(methodIdentity, options);
-        public virtual Task<R> ExecuteAsync<R>(string methodIdentity, ExecutionOptions options) => ExecuteAsync_<R>(methodIdentity, options);
+        public virtual Task<R> ExecuteAsync<R>(int methodIdentity) => ExecuteAsyncInternal<R>(methodIdentity, ExecutionOptions.Default);
+        public virtual Task<R> ExecuteAsync<R>(string methodIdentity) => ExecuteAsyncInternal<R>(methodIdentity, ExecutionOptions.Default);
+        public virtual Task<R> ExecuteAsync<R>(int methodIdentity, ExecutionOptions options) => ExecuteAsyncInternal<R>(methodIdentity, options);
+        public virtual Task<R> ExecuteAsync<R>(string methodIdentity, ExecutionOptions options) => ExecuteAsyncInternal<R>(methodIdentity, options);
 
-        async Task<R> ExecuteAsync_<R>(object methodIdentity, ExecutionOptions options)
+        async Task<R> ExecuteAsyncInternal<R>(object methodIdentity, ExecutionOptions options)
         {
+            CheckClosed();
             RemotingRequest request = GetRequest(methodIdentity, true);
             request.HasArgument = false;
             await SendAndWait(request, options).ConfigureAwait(false);
             return (R)request.Result;
         }
 
-        public virtual Task<R> ExecuteAsync<R, A>(int methodIdentity, A arg) => ExecuteAsync_<R, A>(methodIdentity, arg, ExecutionOptions.Default);
-        public virtual Task<R> ExecuteAsync<R, A>(string methodIdentity, A arg) => ExecuteAsync_<R, A>(methodIdentity, arg, ExecutionOptions.Default);
-        public virtual Task<R> ExecuteAsync<R, A>(int methodIdentity, A arg, ExecutionOptions options) => ExecuteAsync_<R, A>(methodIdentity, arg, options);
-        public virtual Task<R> ExecuteAsync<R, A>(string methodIdentity, A arg, ExecutionOptions options) => ExecuteAsync_<R, A>(methodIdentity, arg, options);
+        public virtual Task<R> ExecuteAsync<R, A>(int methodIdentity, A arg) => ExecuteAsyncInternal<R, A>(methodIdentity, arg, ExecutionOptions.Default);
+        public virtual Task<R> ExecuteAsync<R, A>(string methodIdentity, A arg) => ExecuteAsyncInternal<R, A>(methodIdentity, arg, ExecutionOptions.Default);
+        public virtual Task<R> ExecuteAsync<R, A>(int methodIdentity, A arg, ExecutionOptions options) => ExecuteAsyncInternal<R, A>(methodIdentity, arg, options);
+        public virtual Task<R> ExecuteAsync<R, A>(string methodIdentity, A arg, ExecutionOptions options) => ExecuteAsyncInternal<R, A>(methodIdentity, arg, options);
 
-        async Task<R> ExecuteAsync_<R, A>(object methodIdentity, A arg, ExecutionOptions options)
+        async Task<R> ExecuteAsyncInternal<R, A>(object methodIdentity, A arg, ExecutionOptions options)
         {
+            CheckClosed();
             RemotingRequest request = GetRequest(methodIdentity, true);
             request.HasArgument = true;
             request.Argument = arg;
@@ -464,25 +512,26 @@ namespace Warden.Rpc
             return (R)request.Result;
         }
 
-        public virtual void Send(int methodIdentity) => Send_(methodIdentity, SendingOptions.Default);
-        public virtual void Send(string methodIdentity) => Send_(methodIdentity, SendingOptions.Default);
-        public virtual void Send(int methodIdentity, SendingOptions sendingOptions) => Send_(methodIdentity, sendingOptions);
-        public virtual void Send(string methodIdentity, SendingOptions sendingOptions) => Send_(methodIdentity, sendingOptions);
+        public virtual void Send(int methodIdentity) => SendInternal(methodIdentity, SendingOptions.Default);
+        public virtual void Send(string methodIdentity) => SendInternal(methodIdentity, SendingOptions.Default);
+        public virtual void Send(int methodIdentity, SendingOptions sendingOptions) => SendInternal(methodIdentity, sendingOptions);
+        public virtual void Send(string methodIdentity, SendingOptions sendingOptions) => SendInternal(methodIdentity, sendingOptions);
 
-        void Send_(object methodIdentity, SendingOptions sendingOptions)
+        void SendInternal(object methodIdentity, SendingOptions sendingOptions)
         {
+            CheckClosed();
             RemotingRequest request = GetRequest(methodIdentity, false);
             request.HasArgument = false;
             this.logger.Debug($"Sending {request}");
             SendMessage(request);
         }
 
-        public virtual void Send<T>(int methodIdentity, T arg) => Send_(methodIdentity, arg, SendingOptions.Default);
-        public virtual void Send<T>(string methodIdentity, T arg) => Send_(methodIdentity, arg, SendingOptions.Default);
-        public virtual void Send<T>(int methodIdentity, T arg, SendingOptions sendingOptions) => Send_(methodIdentity, arg, sendingOptions);
-        public virtual void Send<T>(string methodIdentity, T arg, SendingOptions sendingOptions) => Send_(methodIdentity, arg, sendingOptions);
+        public virtual void Send<T>(int methodIdentity, T arg) => SendInternal(methodIdentity, arg, SendingOptions.Default);
+        public virtual void Send<T>(string methodIdentity, T arg) => SendInternal(methodIdentity, arg, SendingOptions.Default);
+        public virtual void Send<T>(int methodIdentity, T arg, SendingOptions sendingOptions) => SendInternal(methodIdentity, arg, sendingOptions);
+        public virtual void Send<T>(string methodIdentity, T arg, SendingOptions sendingOptions) => SendInternal(methodIdentity, arg, sendingOptions);
 
-        void Send_<T>(object methodIdentity, T arg, SendingOptions sendingOptions)
+        void SendInternal<T>(object methodIdentity, T arg, SendingOptions sendingOptions)
         {
             CheckClosed();
             RemotingRequest request = GetRequest(methodIdentity, false);
