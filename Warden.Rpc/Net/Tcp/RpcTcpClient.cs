@@ -2,13 +2,14 @@ using System;
 using System.Net;
 using System.Threading.Tasks;
 using Warden.Logging;
+using Warden.Networking.Cryptography;
 using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
 using Warden.Rpc.Net.Tcp.Events;
 
 namespace Warden.Rpc.Net.Tcp
 {
-    public class RpcTcpClient : IRpcPeerEventListener
+    public class RpcTcpClient : IRpcPeer
     {
         internal class InnerTcpClient : TcpClient
         {
@@ -49,12 +50,10 @@ namespace Warden.Rpc.Net.Tcp
                 throw new ArgumentNullException(nameof(configuration));
             if (configuration.Serializer == null)
                 throw new ArgumentNullException(nameof(configuration.Serializer));
-            if (configuration.SessionFactory == null)
-                throw new ArgumentNullException(nameof(configuration.Serializer));
             configuration.Lock();
             this.configuration = configuration;
             this.innerTcpClient = new InnerTcpClient(this, configuration);
-            this.logger = configuration.LogManager.GetLogger(nameof(RpcTcpServer));
+            this.logger = configuration.LogManager.GetLogger(nameof(RpcTcpClient));
             this.logger.Meta["kind"] = this.GetType().Name;
         }
         
@@ -74,11 +73,23 @@ namespace Warden.Rpc.Net.Tcp
                 throw new InvalidOperationException("Session already started");
             
             this.tcsSessionOpened = new TaskCompletionSource<SessionOpenedEventArgs>();
-            
-            await innerTcpClient.ConnectAsync(host, port)
-                .ConfigureAwait(false);
-            await tcsSessionOpened.Task
-                .ConfigureAwait(false);
+            try
+            {
+
+                await innerTcpClient.ConnectAsync(host, port)
+                    .ConfigureAwait(false);
+                var openedArgs = await tcsSessionOpened.Task
+                    .ConfigureAwait(false);
+                await Authenticate(openedArgs).ConfigureAwait(false);
+
+                OnSessionStarted(openedArgs);
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Exception on establishing session: {ex}");
+                this.CloseSession();
+                throw;
+            }
         }
 
         public virtual async Task StartSession(IPEndPoint endpoint)
@@ -94,32 +105,38 @@ namespace Warden.Rpc.Net.Tcp
                     .ConfigureAwait(false);
                 var openedArgs = await tcsSessionOpened.Task
                     .ConfigureAwait(false);
-                await Authenticate(openedArgs);
-
-                this.Session = openedArgs.Session;
-
-                try
-                {
-                    OnSessionOpened(openedArgs);
-                }
-                catch (Exception e)
-                {
-                    logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpened)}: {e}");
-                }
-
-                try
-                {
-                    OnSessionOpenedEvent?.Invoke(openedArgs);
-                }
-                catch (Exception e)
-                {
-                    logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpenedEvent)}: {e}");
-                }
+                await Authenticate(openedArgs).ConfigureAwait(false);;
+                
+                OnSessionStarted(openedArgs);
             }
             catch (Exception ex)
             {
-                logger.Error($"Exception on establishing session: {ex}");
                 this.CloseSession();
+                logger.Error($"Exception on establishing session: {ex}");
+                throw;
+            }
+        }
+
+        void OnSessionStarted(SessionOpenedEventArgs args)
+        {
+            this.Session = args.Session;
+            
+            try
+            {
+                OnSessionOpened(args);
+            }
+            catch (Exception e)
+            {
+                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpened)}: {e}");
+            }
+
+            try
+            {
+                OnSessionOpenedEvent?.Invoke(args);
+            }
+            catch (Exception e)
+            {
+                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpenedEvent)}: {e}");
             }
         }
 
@@ -133,20 +150,35 @@ namespace Warden.Rpc.Net.Tcp
             innerTcpClient.Disconnect();
         }
 
+        RpcSession IRpcPeer.CreateSession(RpcSessionContext context)
+        {
+            return CreateSession(context);
+        }
+
+        protected virtual RpcSession CreateSession(RpcSessionContext context)
+        {
+            if (configuration.SessionFactory == null)
+                throw new ArgumentNullException(nameof(configuration.SessionFactory));
+
+            return configuration.SessionFactory.CreateSession(context);
+        }
+
         protected internal virtual RpcTcpConnection CreateConnection()
         {
             RpcTcpConnection connection = null;
-            if (configuration.Cipher != null)
+            
+            if (configuration.IsCipherSet)
             {
-                connection =
-                    new RpcTcpConnectionEncrypted(innerTcpClient, configuration.Cipher, this, configuration);
+                ICipher cipher = configuration.CreateNewCipher();
+                RpcTcpConnectionEncrypted encryptedConnection =
+                    new RpcTcpConnectionEncrypted(innerTcpClient, this, configuration);
+                encryptedConnection.SetCipher(cipher);
+                connection = encryptedConnection;
             }
             else
             {
                 connection = new RpcTcpConnection(innerTcpClient, this, configuration);
             }
-
-            connection.RpcInit();
             return connection;
         }
 
@@ -160,7 +192,7 @@ namespace Warden.Rpc.Net.Tcp
             
         }
         
-        void IRpcPeerEventListener.OnSessionOpened(SessionOpenedEventArgs args)
+        void IRpcPeer.OnSessionOpened(SessionOpenedEventArgs args)
         {
             tcsSessionOpened?.TrySetResult(args);
         }
@@ -170,7 +202,7 @@ namespace Warden.Rpc.Net.Tcp
             
         }
         
-        void IRpcPeerEventListener.OnSessionClosed(SessionClosedEventArgs args)
+        void IRpcPeer.OnSessionClosed(SessionClosedEventArgs args)
         {
             this.Session = null;
             

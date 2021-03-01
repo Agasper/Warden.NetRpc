@@ -66,12 +66,7 @@ namespace Warden.Rpc
             this.defaultExecutionTimeout = sessionContext.DefaultExecutionTimeout;
             this.logger = sessionContext.LogManager.GetLogger(nameof(RpcSession));
             this.logger.Meta["kind"] = this.GetType().Name;
-        }
-
-
-        public void MergeFrom(ReadFormatterInfo readFormatterInfo)
-        {
-            
+            this.logger.Debug($"{sessionContext.Connection} created {this}");
         }
 
         public virtual void InitializeRemotingObject(object obj)

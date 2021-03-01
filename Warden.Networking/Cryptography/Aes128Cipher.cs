@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 
 namespace Warden.Networking.Cryptography
 {
-    public class Aes128Cipher : ICipher, IDisposable
+    public class Aes128Cipher : ICipher
     {
         public int KeySize => cipher.KeySize / 8;
         

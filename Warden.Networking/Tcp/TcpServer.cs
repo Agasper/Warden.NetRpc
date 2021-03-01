@@ -160,7 +160,7 @@ namespace Warden.Networking.Tcp
                 long newId = Interlocked.Increment(ref connectionId);
                 TcpConnection connection = this.CreateConnection();
                 connection.CheckParent(this);
-                connection.Init(newId, connSocket);
+                connection.Init(newId, connSocket, false);
 
                 if (!connections.TryAdd(newId, connection))
                 {

@@ -14,34 +14,35 @@ namespace Warden.Rpc.Net.Tcp
         
         RpcSession session;
         readonly RpcTcpConfiguration configuration;
-        readonly IRpcPeerEventListener eventListener;
+        readonly IRpcPeer rpcPeer;
 
-        internal RpcTcpConnection(TcpPeer parent, IRpcPeerEventListener eventListener, RpcTcpConfiguration configuration) : base(parent)
+        internal RpcTcpConnection(TcpPeer parent, IRpcPeer rpcPeer, RpcTcpConfiguration configuration) : base(parent)
         {
             this.configuration = configuration;
-            this.eventListener = eventListener;
+            this.rpcPeer = rpcPeer;
         }
 
-        internal virtual void RpcInit()
+        protected override void OnConnectionOpened(ConnectionOpenedEventArgs args)
         {
-            RpcInitInternal();
+            InitSession();
         }
 
-        private protected virtual void RpcInitInternal()
+        private protected virtual void InitSession()
         {
-            eventListener.OnSessionOpened(new SessionOpenedEventArgs(CreateSession(), this));
+            var session = CreateSession();
+            rpcPeer.OnSessionOpened(new SessionOpenedEventArgs(session, this));
         }
 
-        public RpcSession CreateSession()
+        protected virtual RpcSession CreateSession()
         {
-            var session_ = configuration.SessionFactory.CreateSession(CreateContext());
-            session_.InitializeRemotingObject(session);
+            var session_ = rpcPeer.CreateSession(CreateContext());
+            session_.InitializeRemotingObject(session_);
             this.session = session_;
 
             return session_;
         }
 
-        RpcSessionContext CreateContext()
+        protected virtual RpcSessionContext CreateContext()
         {
             RpcSessionContext result = new RpcSessionContext();
             result.Connection = this;
@@ -57,12 +58,12 @@ namespace Warden.Rpc.Net.Tcp
 
         protected override void OnConnectionClosed(ConnectionClosedEventArgs args)
         {
-            base.OnConnectionClosed(args);
             if (this.session != null)
             {
                 this.session?.Close();
-                eventListener.OnSessionClosed(new SessionClosedEventArgs(this.session, this));
+                rpcPeer.OnSessionClosed(new SessionClosedEventArgs(this.session, this));
             }
+            base.OnConnectionClosed(args);
         }
 
         protected override void OnMessageReceived(MessageEventArgs args)

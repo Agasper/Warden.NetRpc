@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Warden.Logging;
 using Warden.Networking.Cryptography;
+using Warden.Rpc.Cryptography;
 
 namespace Warden.Rpc.Net.Tcp
 {
@@ -17,9 +18,7 @@ namespace Warden.Rpc.Net.Tcp
         public ILogManager LogManager { get => logManager; set { CheckLocked(); CheckNull(value); logManager = value; } }
         public ISessionFactory SessionFactory { get => sessionFactory; set { CheckLocked(); CheckNull(value); sessionFactory = value; } }
 
-        internal ICipher Cipher => cipher;
-
-        ICipher cipher;
+        ICipherFactory cipherFactory;
         ISessionFactory sessionFactory;
         ILogManager logManager;
         int defaultExecutionTimeout;
@@ -55,9 +54,19 @@ namespace Warden.Rpc.Net.Tcp
             this.TaskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
         }
 
+        internal bool IsCipherSet => this.cipherFactory != null;
+
+        internal ICipher CreateNewCipher()
+        {
+            if (this.cipherFactory == null)
+                throw new NullReferenceException("Cipher not set");
+            return this.cipherFactory.CreateNewCipher();
+        }
+
         public void SetCipher<T>() where T : ICipher, new()
         {
-            this.cipher = new T();
+            CheckLocked();
+            this.cipherFactory = new CipherFactory<T>();
         }
 
         public RpcTcpConfiguration()

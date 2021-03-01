@@ -1,14 +1,16 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
 using Warden.Logging;
+using Warden.Networking.Cryptography;
 using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
 using Warden.Rpc.Net.Tcp.Events;
 
 namespace Warden.Rpc.Net.Tcp
 {
-    public abstract class RpcTcpServer : IRpcPeerEventListener
+    public abstract class RpcTcpServer : IRpcPeer
     {
         internal class InnerTcpServer : TcpServer
         {
@@ -38,6 +40,7 @@ namespace Warden.Rpc.Net.Tcp
 
         readonly InnerTcpServer innerTcpServer;
         readonly RpcTcpConfigurationServer configuration;
+        readonly ConcurrentStack<RpcTcpConnection> stashedConnections;
         protected readonly ILogger logger;
 
         public RpcTcpServer(RpcTcpConfigurationServer configuration)
@@ -46,11 +49,10 @@ namespace Warden.Rpc.Net.Tcp
                 throw new ArgumentNullException(nameof(configuration));
             if (configuration.Serializer == null)
                 throw new ArgumentNullException(nameof(configuration.Serializer));
-            if (configuration.SessionFactory == null)
-                throw new ArgumentNullException(nameof(configuration.Serializer));
             configuration.Lock();
             this.configuration = configuration;
             this.innerTcpServer = new InnerTcpServer(this, configuration);
+            this.stashedConnections = new ConcurrentStack<RpcTcpConnection>();
             this.logger = configuration.LogManager.GetLogger(nameof(RpcTcpServer));
             this.logger.Meta["kind"] = this.GetType().Name;
         }
@@ -95,20 +97,32 @@ namespace Warden.Rpc.Net.Tcp
             innerTcpServer.Listen(endPoint);
         }
 
+        T CreateConnectionInternal<T>(Func<RpcTcpConnection> generator) where T: RpcTcpConnection
+        {
+            if (stashedConnections.TryPop(out RpcTcpConnection connection))
+            {
+                return connection as T;
+            }
+            return generator() as T;
+        }
+
         internal virtual RpcTcpConnection CreateConnection()
         {
             RpcTcpConnection connection = null;
-            if (configuration.Cipher != null)
+            if (configuration.IsCipherSet)
             {
-                connection =
-                    new RpcTcpConnectionEncrypted(innerTcpServer, configuration.Cipher, this, configuration);
+                RpcTcpConnectionEncrypted encryptedConnection =
+                    CreateConnectionInternal<RpcTcpConnectionEncrypted>(() =>
+                        new RpcTcpConnectionEncrypted(innerTcpServer, this, configuration));
+                encryptedConnection.SetCipher(configuration.CreateNewCipher());
+                connection = encryptedConnection;
             }
             else
             {
-                connection = new RpcTcpConnection(innerTcpServer, this, configuration);
+                connection =
+                    CreateConnectionInternal<RpcTcpConnection>(() =>
+                        new RpcTcpConnection(innerTcpServer, this, configuration));
             }
-            
-            connection.RpcInit();
 
             return connection;
         }
@@ -119,12 +133,25 @@ namespace Warden.Rpc.Net.Tcp
             
         }
 
+        RpcSession IRpcPeer.CreateSession(RpcSessionContext context)
+        {
+            return CreateSession(context);
+        }
+
+        protected virtual RpcSession CreateSession(RpcSessionContext context)
+        {
+            if (configuration.SessionFactory == null)
+                throw new ArgumentNullException(nameof(configuration.SessionFactory));
+
+            return configuration.SessionFactory.CreateSession(context);
+        }
+
         protected virtual void OnSessionOpened(SessionOpenedEventArgs args)
         {
 
         }
 
-        void IRpcPeerEventListener.OnSessionOpened(SessionOpenedEventArgs args)
+        void IRpcPeer.OnSessionOpened(SessionOpenedEventArgs args)
         {
             try
             {
@@ -151,7 +178,7 @@ namespace Warden.Rpc.Net.Tcp
             
         }
         
-        void IRpcPeerEventListener.OnSessionClosed(SessionClosedEventArgs args)
+        void IRpcPeer.OnSessionClosed(SessionClosedEventArgs args)
         {
             try
             {

@@ -12,6 +12,7 @@ namespace Warden.Networking.Tcp
 {
     public class TcpConnection : IDisposable
     {
+        public bool IsClientConnection { get; private set; }
         public bool Stashed => stashed;
         public bool Disposed => disposed;
         public virtual object Tag { get; set; }
@@ -100,7 +101,7 @@ namespace Warden.Networking.Tcp
                 throw new InvalidOperationException($"This connection belongs to the another parent");
         }
 
-        public virtual void Init(long connectionId, Socket socket)
+        public virtual void Init(long connectionId, Socket socket, bool isClientConnection)
         {
             if (Disposed)
                 throw new ObjectDisposedException(nameof(TcpConnection));
@@ -108,7 +109,7 @@ namespace Warden.Networking.Tcp
                 throw new InvalidOperationException($"{nameof(TcpConnection)} is still being used (not stashed ot disposed)");
 
             this.stashed = false;
-
+            this.IsClientConnection = isClientConnection;
             this.logger.Meta["connection_id"] = connectionId;
             this.keepAliveResponseGot = true;
             this.Id = connectionId;

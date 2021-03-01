@@ -152,7 +152,7 @@ namespace Warden.Networking.Tcp
                 connection.CheckParent(this);
                 long newId = Interlocked.Increment(ref connectionId);
                 
-                connection.Init(newId, clientSocket);
+                connection.Init(newId, clientSocket, true);
                 connection.StartReceive();
                 
                 if (!connection.Connected)

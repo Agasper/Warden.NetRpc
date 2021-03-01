@@ -1,4 +1,5 @@
 using System;
+using System.Net.Sockets;
 using System.Numerics;
 using System.Security.Cryptography;
 using Warden.Networking.Cryptography;
@@ -24,13 +25,27 @@ namespace Warden.Rpc.Net.Tcp
         
         ICipher cipher;
         
-        internal RpcTcpConnectionEncrypted(TcpPeer parent, ICipher cipher, IRpcPeerEventListener eventListener, RpcTcpConfiguration configuration) : base(parent, eventListener, configuration)
+        internal RpcTcpConnectionEncrypted(TcpPeer parent, IRpcPeer rpcPeer, RpcTcpConfiguration configuration) : base(parent, rpcPeer, configuration)
+        {
+        }
+
+        internal void SetCipher(ICipher cipher)
         {
             this.cipher = cipher;
         }
 
-        internal override void RpcInit()
+        public override void Stash()
         {
+            base.Stash();
+            this.cipher?.Dispose();
+            this.cipher = null;
+        }
+
+        protected override void OnConnectionOpened(ConnectionOpenedEventArgs args)
+        {
+            if (!this.IsClientConnection)
+                return;
+
             byte[] privateKeyBytes = new byte[64];
             byte[] publicKeyBytes = new byte[64];
             rngCsp.GetBytes(privateKeyBytes);
@@ -52,6 +67,7 @@ namespace Warden.Rpc.Net.Tcp
 
             _ = SendMessageAsync(message);
             handshakeSend = true;
+            logger.Debug($"Secure handshake request sent!");
         }
 
         protected override void OnMessageReceived(MessageEventArgs args)
@@ -60,6 +76,7 @@ namespace Warden.Rpc.Net.Tcp
             {
                 if (commonKey == null && !handshakeSend)
                 {
+                    logger.Debug($"Got secure handshake request");
                     BigInteger clientMod;
 
                     using (args.Message)
@@ -88,9 +105,11 @@ namespace Warden.Rpc.Net.Tcp
                     }
 
                     _ = SendMessageAsync(message);
+                    logger.Debug($"Sent secure handshake response");
 
                     cipher.SetKey(GenerateCipherKey128());
-                    base.RpcInitInternal();
+                    logger.Debug($"Common key set!");
+                    base.InitSession();
 
                     return;
                 }
@@ -108,7 +127,8 @@ namespace Warden.Rpc.Net.Tcp
                     }
 
                     cipher.SetKey(GenerateCipherKey128());
-                    base.RpcInitInternal();
+                    logger.Debug($"Common key set!");
+                    base.InitSession();
                     return;
                 }
             }
@@ -140,7 +160,7 @@ namespace Warden.Rpc.Net.Tcp
         public byte[] GenerateCipherKey128()
         {
             if (commonKey == null)
-                throw new InvalidOperationException("Handshake have not been completed. Couldn't set cipher key");
+                throw new InvalidOperationException("Handshake sequence has not been completed. Couldn't set cipher key");
             
             using (MD5 hash = MD5.Create())
             {
