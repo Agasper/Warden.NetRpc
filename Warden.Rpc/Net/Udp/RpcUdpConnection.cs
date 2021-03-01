@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Net;
-using System.Threading.Tasks;
 using Warden.Networking.IO;
 using Warden.Networking.Udp;
 using Warden.Networking.Udp.Events;
 using Warden.Networking.Udp.Messages;
-using Warden.Rpc.Payload;
 
 namespace Warden.Rpc.Net.Udp
 {

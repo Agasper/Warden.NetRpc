@@ -1,5 +1,4 @@
-﻿using System;
-using Warden.Networking.IO;
+﻿using Warden.Networking.IO;
 
 namespace Warden.Rpc
 {

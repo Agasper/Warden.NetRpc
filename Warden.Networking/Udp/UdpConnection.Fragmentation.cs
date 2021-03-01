@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using Warden.Networking.Messages;
 using Warden.Networking.Udp.Channels;
 using Warden.Networking.Udp.Messages;
 

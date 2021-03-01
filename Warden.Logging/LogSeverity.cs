@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Warden.Logging
+﻿namespace Warden.Logging
 {
     public enum LogSeverity
     {

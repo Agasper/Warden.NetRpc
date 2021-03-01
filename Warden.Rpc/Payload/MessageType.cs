@@ -1,5 +1,4 @@
-﻿using System;
-namespace Warden.Rpc.Payload
+﻿namespace Warden.Rpc.Payload
 {
     enum MessageType : byte
     {

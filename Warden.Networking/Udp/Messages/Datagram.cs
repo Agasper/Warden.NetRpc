@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using Warden.Networking.IO;
 using Warden.Networking.Messages;
 using Warden.Util.Buffers;

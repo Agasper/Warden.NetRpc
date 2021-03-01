@@ -1,6 +1,4 @@
-﻿using System;
-using System.Threading;
-using Warden.Logging;
+﻿using Warden.Logging;
 using Warden.Networking.Udp.Messages;
 using Warden.Util.Buffers;
 

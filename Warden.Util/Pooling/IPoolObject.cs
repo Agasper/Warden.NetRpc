@@ -1,5 +1,4 @@
-﻿using System;
-namespace Warden.Util.Pooling
+﻿namespace Warden.Util.Pooling
 {
     public interface IPoolObject
     {

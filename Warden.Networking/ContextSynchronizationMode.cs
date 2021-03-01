@@ -1,5 +1,4 @@
-﻿using System;
-namespace Warden.Networking
+﻿namespace Warden.Networking
 {
     public enum ContextSynchronizationMode
     {

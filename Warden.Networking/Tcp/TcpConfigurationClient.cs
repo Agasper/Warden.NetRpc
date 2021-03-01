@@ -1,5 +1,4 @@
-﻿using System;
-namespace Warden.Networking.Tcp
+﻿namespace Warden.Networking.Tcp
 {
     public class TcpConfigurationClient : TcpConfigurationPeer
     {

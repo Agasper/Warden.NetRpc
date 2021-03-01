@@ -29,7 +29,7 @@ namespace Warden.Rpc.Net.Tcp
             this.cipher = cipher;
         }
 
-        public void SendHandshake()
+        internal override void RpcInit()
         {
             byte[] privateKeyBytes = new byte[64];
             byte[] publicKeyBytes = new byte[64];
@@ -90,7 +90,7 @@ namespace Warden.Rpc.Net.Tcp
                     _ = SendMessageAsync(message);
 
                     cipher.SetKey(GenerateCipherKey128());
-                    base.CreateSession();
+                    base.RpcInitInternal();
 
                     return;
                 }
@@ -108,7 +108,7 @@ namespace Warden.Rpc.Net.Tcp
                     }
 
                     cipher.SetKey(GenerateCipherKey128());
-                    base.CreateSession();
+                    base.RpcInitInternal();
                     return;
                 }
             }

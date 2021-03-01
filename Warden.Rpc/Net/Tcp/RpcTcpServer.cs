@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using Warden.Logging;
 using Warden.Networking.Tcp;
@@ -37,12 +36,14 @@ namespace Warden.Rpc.Net.Tcp
         public event DOnSessionClosed OnSessionClosedEvent;
         public RpcTcpConfigurationServer Configuration => configuration;
 
-        InnerTcpServer innerTcpServer;
-        RpcTcpConfigurationServer configuration;
-        ILogger logger;
+        readonly InnerTcpServer innerTcpServer;
+        readonly RpcTcpConfigurationServer configuration;
+        protected readonly ILogger logger;
 
         public RpcTcpServer(RpcTcpConfigurationServer configuration)
         {
+            if (configuration == null)
+                throw new ArgumentNullException(nameof(configuration));
             if (configuration.Serializer == null)
                 throw new ArgumentNullException(nameof(configuration.Serializer));
             if (configuration.SessionFactory == null)
@@ -99,16 +100,15 @@ namespace Warden.Rpc.Net.Tcp
             RpcTcpConnection connection = null;
             if (configuration.Cipher != null)
             {
-                RpcTcpConnectionEncrypted encryptedConnection =
+                connection =
                     new RpcTcpConnectionEncrypted(innerTcpServer, configuration.Cipher, this, configuration);
-                encryptedConnection.SendHandshake();
-                connection = encryptedConnection;
             }
             else
             {
                 connection = new RpcTcpConnection(innerTcpServer, this, configuration);
-                connection.CreateSession();
             }
+            
+            connection.RpcInit();
 
             return connection;
         }

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -41,6 +40,8 @@ namespace Warden.Networking.Tcp
 
         public TcpClient(TcpConfigurationClient configuration) : base(configuration)
         {
+            if (configuration == null)
+                throw new ArgumentNullException(nameof(configuration));
             this.configuration = configuration;
             this.logger = configuration.LogManager.GetLogger(nameof(TcpClient));
             this.logger.Meta.Add("kind", this.GetType().Name);

@@ -1,5 +1,4 @@
-﻿using System;
-namespace Warden.Networking.Udp.Messages
+﻿namespace Warden.Networking.Udp.Messages
 {
     public enum DeliveryType : byte //MAX = 8 (3 bit)
     {

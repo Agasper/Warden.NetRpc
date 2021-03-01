@@ -1,5 +1,4 @@
-﻿using System;
-namespace Warden.Util.Polling
+﻿namespace Warden.Util.Polling
 {
     public delegate void DPollEvents();
 

@@ -1,5 +1,4 @@
-﻿using System;
-namespace Warden.Networking.Tcp.Messages
+﻿namespace Warden.Networking.Tcp.Messages
 {
     struct TcpRawMessageOptions
     {

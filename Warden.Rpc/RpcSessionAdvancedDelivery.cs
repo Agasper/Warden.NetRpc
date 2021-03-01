@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using Warden.Networking.Udp.Messages;
 using Warden.Rpc.Payload;
 

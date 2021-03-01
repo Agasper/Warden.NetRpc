@@ -1,7 +1,4 @@
-﻿using System;
-using Warden.Networking.IO;
-
-namespace Warden.Rpc.Payload
+﻿namespace Warden.Rpc.Payload
 {
     public class RemotingResponse : RemotingPayload
     {

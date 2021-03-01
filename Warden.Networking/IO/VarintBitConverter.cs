@@ -1,5 +1,4 @@
-﻿using System;
-namespace Warden.Networking.IO
+﻿namespace Warden.Networking.IO
 {
     public class VarintBitConverter
     {

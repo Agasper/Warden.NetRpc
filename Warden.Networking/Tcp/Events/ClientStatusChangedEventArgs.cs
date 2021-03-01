@@ -1,5 +1,4 @@
-﻿using System;
-using static Warden.Networking.Tcp.TcpClient;
+﻿using static Warden.Networking.Tcp.TcpClient;
 
 namespace Warden.Networking.Tcp.Events
 {

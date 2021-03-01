@@ -1,5 +1,4 @@
-﻿using System;
-namespace Warden.Rpc
+﻿namespace Warden.Rpc
 {
     public class SendingOptions
     {

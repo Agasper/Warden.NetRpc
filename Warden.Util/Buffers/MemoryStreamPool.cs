@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using Warden.Util.Buffers.Internal;
 
 namespace Warden.Util.Buffers

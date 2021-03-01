@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Warden.Logging;
 using Warden.Networking.Udp;
 
 namespace Warden.Rpc.Net.Udp

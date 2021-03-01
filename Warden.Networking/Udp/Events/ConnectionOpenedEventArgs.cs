@@ -1,5 +1,4 @@
 ﻿using System;
-using Warden.Networking.Udp;
 
 namespace Warden.Networking.Udp.Events
 {

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Tasks;
 using Warden.Logging;
 
 namespace Warden.Networking.Tcp
@@ -30,6 +29,8 @@ namespace Warden.Networking.Tcp
 
         public TcpServer(TcpConfigurationServer configuration) : base(configuration)
         {
+            if (configuration == null)
+                throw new ArgumentNullException(nameof(configuration));
             if (configuration.AcceptThreads < 1 || configuration.AcceptThreads > 10)
                 throw new ArgumentOutOfRangeException($"{nameof(configuration.AcceptThreads)} should be in range 1-10");
             this.connections = new ConcurrentDictionary<long, TcpConnection>(

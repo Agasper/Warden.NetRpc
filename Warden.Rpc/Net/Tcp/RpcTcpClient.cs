@@ -37,13 +37,16 @@ namespace Warden.Rpc.Net.Tcp
         public event DOnSessionOpened OnSessionOpenedEvent;
         public event DOnSessionClosed OnSessionClosedEvent;
         
-        InnerTcpClient innerTcpClient;
-        RpcTcpConfigurationClient configuration;
-        ILogger logger;
-        TaskCompletionSource<object> tcsSessionReady;
+        readonly InnerTcpClient innerTcpClient;
+        readonly RpcTcpConfigurationClient configuration;
+        protected readonly ILogger logger;
+        
+        TaskCompletionSource<SessionOpenedEventArgs> tcsSessionOpened;
 
         public RpcTcpClient(RpcTcpConfigurationClient configuration)
         {
+            if (configuration == null)
+                throw new ArgumentNullException(nameof(configuration));
             if (configuration.Serializer == null)
                 throw new ArgumentNullException(nameof(configuration.Serializer));
             if (configuration.SessionFactory == null)
@@ -65,24 +68,64 @@ namespace Warden.Rpc.Net.Tcp
             innerTcpClient.Shutdown();
         }
 
-        public async Task StartSession(string host, int port)
+        public virtual async Task StartSession(string host, int port)
         {
-            this.tcsSessionReady = new TaskCompletionSource<object>();
+            if (Session != null)
+                throw new InvalidOperationException("Session already started");
+            
+            this.tcsSessionOpened = new TaskCompletionSource<SessionOpenedEventArgs>();
             
             await innerTcpClient.ConnectAsync(host, port)
                 .ConfigureAwait(false);
-            await tcsSessionReady.Task
+            await tcsSessionOpened.Task
                 .ConfigureAwait(false);
         }
 
-        public async Task StartSession(IPEndPoint endpoint)
+        public virtual async Task StartSession(IPEndPoint endpoint)
         {
-            this.tcsSessionReady = new TaskCompletionSource<object>();
+            if (Session != null)
+                throw new InvalidOperationException("Session already started");
             
-            await innerTcpClient.ConnectAsync(endpoint)
-                .ConfigureAwait(false);
-            await tcsSessionReady.Task
-                .ConfigureAwait(false);
+            this.tcsSessionOpened = new TaskCompletionSource<SessionOpenedEventArgs>();
+
+            try
+            {
+                await innerTcpClient.ConnectAsync(endpoint)
+                    .ConfigureAwait(false);
+                var openedArgs = await tcsSessionOpened.Task
+                    .ConfigureAwait(false);
+                await Authenticate(openedArgs);
+
+                this.Session = openedArgs.Session;
+
+                try
+                {
+                    OnSessionOpened(openedArgs);
+                }
+                catch (Exception e)
+                {
+                    logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpened)}: {e}");
+                }
+
+                try
+                {
+                    OnSessionOpenedEvent?.Invoke(openedArgs);
+                }
+                catch (Exception e)
+                {
+                    logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpenedEvent)}: {e}");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Exception on establishing session: {ex}");
+                this.CloseSession();
+            }
+        }
+
+        protected virtual Task Authenticate(SessionOpenedEventArgs args)
+        {
+            return Task.CompletedTask;
         }
 
         public void CloseSession()
@@ -95,23 +138,21 @@ namespace Warden.Rpc.Net.Tcp
             RpcTcpConnection connection = null;
             if (configuration.Cipher != null)
             {
-                RpcTcpConnectionEncrypted encryptedConnection =
+                connection =
                     new RpcTcpConnectionEncrypted(innerTcpClient, configuration.Cipher, this, configuration);
-                encryptedConnection.SendHandshake();
-                connection = encryptedConnection;
             }
             else
             {
                 connection = new RpcTcpConnection(innerTcpClient, this, configuration);
-                connection.CreateSession();
             }
 
+            connection.RpcInit();
             return connection;
         }
 
         internal void OnConnectionClosedInternal(ConnectionClosedEventArgs args)
         {
-            tcsSessionReady?.TrySetException(new InvalidOperationException("Connection closed prematurely"));
+            tcsSessionOpened?.TrySetException(new InvalidOperationException("Connection closed prematurely"));
         }
 
         void OnSessionOpened(SessionOpenedEventArgs args)
@@ -121,27 +162,7 @@ namespace Warden.Rpc.Net.Tcp
         
         void IRpcPeerEventListener.OnSessionOpened(SessionOpenedEventArgs args)
         {
-            this.Session = args.Session;
-            tcsSessionReady?.TrySetResult(null);
-            
-            try
-            {
-                OnSessionOpened(args);
-            }
-            catch (Exception e)
-            {
-                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpened)}: {e}");
-            }
-
-            try
-            {
-                OnSessionOpenedEvent?.Invoke(args);
-            }
-            catch (Exception e)
-            {
-                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpenedEvent)}: {e}");
-            }
-
+            tcsSessionOpened?.TrySetResult(args);
         }
 
         void OnSessionClosed(SessionClosedEventArgs args)

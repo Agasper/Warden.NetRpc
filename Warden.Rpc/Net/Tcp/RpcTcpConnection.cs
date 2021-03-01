@@ -1,13 +1,8 @@
-﻿using System;
-using System.Net;
-using System.Threading.Tasks;
-using Warden.Networking.IO;
+﻿using Warden.Networking.IO;
 using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
 using Warden.Networking.Tcp.Messages;
-using Warden.Rpc;
 using Warden.Rpc.Net.Tcp.Events;
-using Warden.Rpc.Net.Udp;
 
 //using static Warden.Rpc.Net.Tcp.RpcTcpServer;
 
@@ -17,9 +12,9 @@ namespace Warden.Rpc.Net.Tcp
     {
         public RpcSession Session => session;
         
-        RpcTcpConfiguration configuration;
         RpcSession session;
-        IRpcPeerEventListener eventListener;
+        readonly RpcTcpConfiguration configuration;
+        readonly IRpcPeerEventListener eventListener;
 
         internal RpcTcpConnection(TcpPeer parent, IRpcPeerEventListener eventListener, RpcTcpConfiguration configuration) : base(parent)
         {
@@ -27,13 +22,23 @@ namespace Warden.Rpc.Net.Tcp
             this.eventListener = eventListener;
         }
 
-        protected internal virtual void CreateSession()
+        internal virtual void RpcInit()
+        {
+            RpcInitInternal();
+        }
+
+        private protected virtual void RpcInitInternal()
+        {
+            eventListener.OnSessionOpened(new SessionOpenedEventArgs(CreateSession(), this));
+        }
+
+        public RpcSession CreateSession()
         {
             var session_ = configuration.SessionFactory.CreateSession(CreateContext());
             session_.InitializeRemotingObject(session);
             this.session = session_;
-            
-            eventListener.OnSessionOpened(new SessionOpenedEventArgs(session_, this));
+
+            return session_;
         }
 
         RpcSessionContext CreateContext()

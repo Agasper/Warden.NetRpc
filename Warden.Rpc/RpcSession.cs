@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,7 +30,7 @@ namespace Warden.Rpc
 
         readonly object orderedExecutionTaskMutex = new object();
         readonly object lastRequestIdMutex = new object();
-        readonly protected internal ILogger logger;
+        protected readonly ILogger logger;
         readonly TaskScheduler taskScheduler;
         
         Task orderedExecutionTask;
@@ -251,12 +250,14 @@ namespace Warden.Rpc
 
                 logger.Debug($"Executing {request} locally");
 
-                LocalExecutionStartingEventArgs eventArgsStarting = new LocalExecutionStartingEventArgs(request);
+                ExecutionRequest executionRequest = new ExecutionRequest(request);
+
+                LocalExecutionStartingEventArgs eventArgsStarting = new LocalExecutionStartingEventArgs(executionRequest);
                 OnLocalExecutionStarting(eventArgsStarting);
 
                 Stopwatch sw = new Stopwatch();
                 sw.Start();
-                var result = await ExecuteRequestAsync(new ExecutionRequest(request)).ConfigureAwait(false);
+                var executionResponse = await ExecuteRequestAsync(new ExecutionRequest(request)).ConfigureAwait(false);
                 sw.Stop();
 
 
@@ -269,14 +270,14 @@ namespace Warden.Rpc
                 if (request.ExpectResponse)
                 {
                     response = new RemotingResponse();
-                    response.HasArgument = result.HasResult;
-                    response.Argument = result.Result;
+                    response.HasArgument = executionResponse.HasResult;
+                    response.Argument = executionResponse.Result;
                     response.RequestId = request.RequestId;
                     response.ExecutionTime = timeSpanTicks;
                 }
                 
                 LocalExecutionCompletedEventArgs eventArgsCompleted =
-                    new LocalExecutionCompletedEventArgs(request, response, ms);
+                    new LocalExecutionCompletedEventArgs(executionRequest, executionResponse, ms);
                 OnLocalExecutionCompleted(eventArgsCompleted);
 
                 if (response != null)
@@ -300,7 +301,7 @@ namespace Warden.Rpc
 
             try
             {
-                OnRemoteExecutionException(new RemoteExecutionExceptionEventArgs(remotingRequest, exception, options));
+                OnRemoteExecutionException(new RemoteExecutionExceptionEventArgs(new ExecutionRequest(remotingRequest), exception, options));
             }
             catch (Exception ex)
             {
@@ -322,7 +323,7 @@ namespace Warden.Rpc
             try
             {
                 LocalExecutionExceptionEventArgs eventArgs = new LocalExecutionExceptionEventArgs(exception,
-                    remotingRequest);
+                    new ExecutionRequest(remotingRequest));
                 OnLocalExecutionException(eventArgs);
             }
             catch (Exception ex)
@@ -371,22 +372,22 @@ namespace Warden.Rpc
             OnSessionReady();
         }
 
-        protected virtual async Task<ExecutionResult> ExecuteRequestAsync(ExecutionRequest request)
+        protected virtual async Task<ExecutionResponse> ExecuteRequestAsync(ExecutionRequest request)
         {
             if (remotingObjectScheme == null || remotingObject == null)
                 throw new NullReferenceException("RpcSession isn't initialized properly. Remoting object is null");
 
             var container = remotingObjectScheme.GetInvocationContainer(request.MethodKey);
 
-            object result = null;
+            object result;
             if (request.HasArgument)
                 result = await container.InvokeAsync(remotingObject, request.Argument).ConfigureAwait(false);
             else
                 result = await container.InvokeAsync(remotingObject).ConfigureAwait(false);
 
-            ExecutionResult executionResult = new ExecutionResult(container.DoesReturnValue, result);
+            ExecutionResponse executionResponse = new ExecutionResponse(container.DoesReturnValue, result);
 
-            return executionResult;
+            return executionResponse;
         }
 
         protected internal RemotingRequest GetRequest(object methodIdentity, bool expectResponse)
@@ -434,7 +435,8 @@ namespace Warden.Rpc
             try
             {
                 this.logger.Debug($"Executing {request} remotely with {options}");
-                OnRemoteExecutionStarting(new RemoteExecutionStartingEventArgs(request, options));
+                ExecutionRequest executionRequest = new ExecutionRequest(request);
+                OnRemoteExecutionStarting(new RemoteExecutionStartingEventArgs(executionRequest, options));
                 SendMessage(request);
                 int timeout = defaultExecutionTimeout;
                 if (options.Timeout > Timeout.Infinite)
@@ -442,7 +444,8 @@ namespace Warden.Rpc
                 await RemoteExecutionWrapper(request, options,request.WaitAsync(timeout)).ConfigureAwait(false);
                 float ms = request.Response.ExecutionTime / (float) TimeSpan.TicksPerMillisecond;
                 this.logger.Debug($"Executed {request} remotely in {ms.ToString("0.00")}ms");
-                OnRemoteExecutionCompleted(new RemoteExecutionCompletedEventArgs(request, request.Response, options, ms));
+                OnRemoteExecutionCompleted(new RemoteExecutionCompletedEventArgs(executionRequest,
+                    new ExecutionResponse(request.Response), options, ms));
             }
             catch (Exception ex)
             {

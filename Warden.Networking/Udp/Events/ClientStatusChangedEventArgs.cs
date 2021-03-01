@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Warden.Networking.Udp.Events
+﻿namespace Warden.Networking.Udp.Events
 {
     public class ConnectionStatusChangedEventArgs
     {
