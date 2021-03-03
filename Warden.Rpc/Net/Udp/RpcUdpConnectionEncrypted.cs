@@ -1,37 +1,39 @@
-using System;
-using System.Net.Sockets;
-using System.Numerics;
-using System.Security.Cryptography;
+﻿using System;
+using System.Net;
 using Warden.Networking.Cryptography;
 using Warden.Networking.IO;
 using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
 using Warden.Networking.Tcp.Messages;
+using Warden.Networking.Udp;
+using Warden.Networking.Udp.Messages;
 using Warden.Rpc.Net.Events;
+using Warden.Rpc.Net.Tcp;
+using ConnectionClosedEventArgs = Warden.Networking.Udp.Events.ConnectionClosedEventArgs;
+using ConnectionOpenedEventArgs = Warden.Networking.Udp.Events.ConnectionOpenedEventArgs;
 
-namespace Warden.Rpc.Net.Tcp
+namespace Warden.Rpc.Net.Udp
 {
-    public class RpcTcpConnectionEncrypted : RpcTcpConnection
+    public class RpcUdpConnectionEncrypted : RpcUdpConnection
     {
         DiffieHellmanImpl dh;
         ICipher cipher;
         
-        internal RpcTcpConnectionEncrypted(TcpPeer parent, IRpcPeer rpcPeer, RpcConfiguration configuration) : base(parent, rpcPeer, configuration)
+        internal RpcUdpConnectionEncrypted(UdpPeer parent, ICipher cipher, IRpcPeer rpcPeer, RpcConfiguration configuration) : base(parent, rpcPeer, configuration)
         {
-        }
-
-        internal void SetCipher(ICipher cipher)
-        {
+            if (cipher == null)
+                throw new ArgumentNullException(nameof(cipher));
             this.cipher = cipher;
             this.dh = new DiffieHellmanImpl(cipher);
         }
 
-        public override void Stash()
+        protected override void OnConnectionClosed(ConnectionClosedEventArgs args)
         {
-            base.Stash();
             this.cipher?.Dispose();
             this.cipher = null;
             this.dh = null;
+            
+            base.OnConnectionClosed(args);
         }
 
         protected override void OnConnectionOpened(ConnectionOpenedEventArgs args)
@@ -41,11 +43,11 @@ namespace Warden.Rpc.Net.Tcp
 
             var message = Parent.CreateMessage();
             dh.SendHandshakeRequest(message.BaseStream);
-            _ = SendMessageAsync(message);
+            _ = SendMessage(new Networking.Udp.Messages.MessageInfo(message, DeliveryType.ReliableOrdered, 0));
             logger.Debug($"Secure handshake request sent!");
         }
 
-        protected override void OnMessageReceived(MessageEventArgs args)
+        protected override void OnMessageReceived(Networking.Udp.Messages.MessageInfo messageInfo)
         {
             try
             {
@@ -53,8 +55,8 @@ namespace Warden.Rpc.Net.Tcp
                 {
                     logger.Debug($"Got secure handshake request");
                     var responseMessage = Parent.CreateMessage();
-                    dh.RecvHandshakeRequest(args.Message.BaseStream, responseMessage.BaseStream);
-                    _ = SendMessageAsync(responseMessage);
+                    dh.RecvHandshakeRequest(messageInfo.Message.BaseStream, responseMessage.BaseStream);
+                    _ = SendMessage(new Networking.Udp.Messages.MessageInfo(responseMessage, DeliveryType.ReliableOrdered, 0));
                     logger.Debug($"Sent secure handshake response, common key set!");
                     base.InitSession();
                     return;
@@ -62,7 +64,7 @@ namespace Warden.Rpc.Net.Tcp
 
                 if (dh.Status == DiffieHellmanImpl.DhStatus.WaitingForServerMod)
                 {
-                    dh.RecvHandshakeResponse(args.Message.BaseStream);
+                    dh.RecvHandshakeResponse(messageInfo.Message.BaseStream);
                     logger.Debug($"Got secure handshake response, common key set!");
                     base.InitSession();
                     return;
@@ -77,11 +79,11 @@ namespace Warden.Rpc.Net.Tcp
 
             try
             {
-                using (args.Message)
+                using (messageInfo.Message)
                 {
-                    using (var decryptedMessage = args.Message.Decrypt(cipher))
+                    using (var decryptedMessage = messageInfo.Message.Decrypt(cipher))
                     {
-                        base.OnMessageReceived(new MessageEventArgs(this, decryptedMessage));
+                        base.OnMessageReceived(new Networking.Udp.Messages.MessageInfo(decryptedMessage, messageInfo.DeliveryType, messageInfo.Channel));
                     }
                 }
             }
@@ -92,14 +94,14 @@ namespace Warden.Rpc.Net.Tcp
             }
         }
 
-        private protected override void SendRawMessage(TcpRawMessage message)
+        protected override UdpSendStatus SendRawMessage(Networking.Udp.Messages.MessageInfo messageInfo)
         {
-            using (message)
+            using (messageInfo.Message)
             {
-                TcpRawMessage encryptedMessage = message.Encrypt(cipher);
-                base.SendRawMessage(encryptedMessage);
+                UdpRawMessage encryptedMessage = messageInfo.Message.Encrypt(cipher);
+                return base.SendRawMessage(new Networking.Udp.Messages.MessageInfo(encryptedMessage, messageInfo.DeliveryType,
+                    messageInfo.Channel));
             }
         }
-
     }
 }

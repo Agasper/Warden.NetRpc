@@ -1,66 +1,184 @@
 ﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
+using Warden.Logging;
 using Warden.Networking.Udp;
+using Warden.Networking.Udp.Events;
+using Warden.Rpc.Net.Events;
 
 namespace Warden.Rpc.Net.Udp
 {
-    public class RpcUdpServer
+    public class RpcUdpServer : IRpcPeer
     {
-        class InnerUdpServer : UdpServer
+        internal class InnerUdpServer : UdpServer
         {
-            RpcUdpServerConfiguration configuration;
+            RpcUdpServer parent;
 
-            public InnerUdpServer(RpcUdpServerConfiguration configuration) : base(configuration)
+            public InnerUdpServer(RpcUdpServer parent, RpcUdpConfigurationServer configuration) : base(configuration.UdpConfiguration)
             {
-                this.configuration = configuration;
+                this.parent = parent;
             }
             
             protected override UdpConnection CreateConnection()
             {
-                var connection = new RpcUdpConnection(this, configuration);
-                connection.CreateSession();
-                return connection;
+                return parent.CreateConnection();
+            }
+
+            protected override void OnConnectionClosed(ConnectionClosedEventArgs args)
+            {
+                parent.OnConnectionClosedInternal(args);
+                base.OnConnectionClosed(args);
             }
         }
 
-        public RpcUdpServerConfiguration Configuration => configuration;
+        public event DOnSessionOpened OnSessionOpenedEvent;
+        public event DOnSessionClosed OnSessionClosedEvent;
+        public RpcUdpConfigurationServer Configuration => configuration;
 
-        InnerUdpServer innerUdpServer;
-        RpcUdpServerConfiguration configuration;
+        readonly InnerUdpServer innerUdpServer;
+        readonly RpcUdpConfigurationServer configuration;
+        protected readonly ILogger logger;
 
-        public RpcUdpServer(RpcUdpServerConfiguration configuration)
+        public RpcUdpServer(RpcUdpConfigurationServer configuration)
         {
+            if (configuration == null)
+                throw new ArgumentNullException(nameof(configuration));
             if (configuration.Serializer == null)
                 throw new ArgumentNullException(nameof(configuration.Serializer));
-            if (configuration.SessionFactory == null)
-                throw new ArgumentNullException(nameof(configuration.Serializer));
+            configuration.Lock();
             this.configuration = configuration;
-            this.innerUdpServer = new InnerUdpServer(configuration);
+            this.innerUdpServer = new InnerUdpServer(this, configuration);
+            this.logger = configuration.LogManager.GetLogger(nameof(RpcUdpServer));
+            this.logger.Meta["kind"] = this.GetType().Name;
+        }
+
+        public int SessionsCount => innerUdpServer.Connections.Count;
+
+        public IEnumerable<RpcSession> Sessions
+        {
+            get
+            {
+                foreach (var connection in innerUdpServer.Connections.Values)
+                {
+                    var session = (connection as RpcUdpConnection)?.Session;
+                    if (session != null)
+                        yield return session;
+                }
+            }
         }
 
         public void Start()
         {
-            this.innerUdpServer.Start();
+            innerUdpServer.Start();
         }
-
+        
         public void Shutdown()
         {
-            this.innerUdpServer.Shutdown();
+            innerUdpServer.Shutdown();
         }
-
+        
         public void Listen(int port)
         {
-            this.innerUdpServer.Listen(port);
+            innerUdpServer.Listen(port);
         }
 
-        public void Listen(IPEndPoint endpoint)
+        public void Listen(string host, int port)
         {
-            this.innerUdpServer.Listen(endpoint);
+            innerUdpServer.Listen(host, port);
         }
 
-        public void Listen(string ip, int port)
+        public void Listen(IPEndPoint endPoint)
         {
-            this.innerUdpServer.Listen(ip, port);
+            innerUdpServer.Listen(endPoint);
+        }
+
+        internal virtual RpcUdpConnection CreateConnection()
+        {
+            RpcUdpConnection connection = null;
+            if (configuration.IsCipherSet)
+            {
+                connection = new RpcUdpConnectionEncrypted(innerUdpServer, configuration.CreateNewCipher(),this, configuration);
+            }
+            else
+            {
+                connection =
+                    new RpcUdpConnection(innerUdpServer, this, configuration);
+            }
+
+            return connection;
+        }
+
+        
+        internal void OnConnectionClosedInternal(ConnectionClosedEventArgs args)
+        {
+            
+        }
+
+        RpcSession IRpcPeer.CreateSession(RpcSessionContext context)
+        {
+            return CreateSession(context);
+        }
+
+        protected virtual RpcSession CreateSession(RpcSessionContext context)
+        {
+            if (configuration.SessionFactory == null)
+                throw new ArgumentNullException(nameof(configuration.SessionFactory));
+
+            return configuration.SessionFactory.CreateSession(context);
+        }
+
+        protected virtual void OnSessionOpened(SessionOpenedEventArgs args)
+        {
+
+        }
+
+        void IRpcPeer.OnSessionOpened(SessionOpenedEventArgs args)
+        {
+            try
+            {
+                OnSessionOpened(args);
+            }
+            catch (Exception e)
+            {
+                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpened)}: {e}");
+            }
+
+            try
+            {
+                OnSessionOpenedEvent?.Invoke(args);
+            }
+            catch (Exception e)
+            {
+                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpenedEvent)}: {e}");
+            }
+
+        }
+
+        protected virtual void OnSessionClosed(SessionClosedEventArgs args)
+        {
+            
+        }
+        
+        void IRpcPeer.OnSessionClosed(SessionClosedEventArgs args)
+        {
+            try
+            {
+                OnSessionClosed(args);
+            }
+            catch (Exception e)
+            {
+                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionClosed)}: {e}");
+            }
+            
+            try
+            {
+                OnSessionClosedEvent?.Invoke(args);
+            }
+            catch (Exception e)
+            {
+                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionClosedEvent)}: {e}");
+            }
         }
     }
 }

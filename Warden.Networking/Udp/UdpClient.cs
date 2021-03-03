@@ -12,7 +12,7 @@ namespace Warden.Networking.Udp
     public class UdpClient : UdpPeer
     {
         public UdpConnectionStatistics Statistics => Connection?.Statistics;
-        public new UdpClientConfiguration Configuration => configuration;
+        public new UdpConfigurationClient Configuration => configuration;
         public UdpConnectionStatus Status
         {
             get
@@ -24,33 +24,19 @@ namespace Warden.Networking.Udp
             }
         }
         public UdpConnection Connection { get; private set; }
-
-        public enum ConnectionStatus
-        {
-            Disconnected = 0,
-            Disconnecting = 1,
-            Connecting = 2,
-            Connected = 3
-        }
-
-        readonly UdpClientConfiguration configuration;
+        readonly UdpConfigurationClient configuration;
 
         private protected override ILogger Logger => logger;
 
         ILogger logger;
 
-        public UdpClient(UdpClientConfiguration configuration) : base(configuration)
+        public UdpClient(UdpConfigurationClient configuration) : base(configuration)
         {
             this.configuration = configuration;
             this.logger = configuration.LogManager.GetLogger(nameof(UdpClient));
             this.logger.Meta["kind"] = this.GetType().Name;
         }
-
-        internal override void OnConnectionStatusChangedSynchronized(ConnectionStatusChangedEventArgs args)
-        {
-            base.OnConnectionStatusChangedSynchronized(args);
-        }
-
+        
         internal override void OnConnectionClosedInternalSynchronized(ConnectionClosedEventArgs args)
         {
             base.OnConnectionClosedInternalSynchronized(args);
@@ -92,9 +78,14 @@ namespace Warden.Networking.Udp
             Bind(new IPEndPoint(IPAddress.Any, 0));
             var connection = CreateConnection();
             Random rnd = new Random();
-            connection.Init(new UdpNetEndpoint(endpoint, (ushort)rnd.Next(0, ushort.MaxValue)));
+            connection.Init(new UdpNetEndpoint(endpoint, (ushort)rnd.Next(0, ushort.MaxValue)), true);
             Connection = connection;
             return connection.Connect();
+        }
+
+        public void Disconnect()
+        {
+            this.Connection?.Close();
         }
 
         private protected override void OnDatagram(Datagram datagram, UdpNetEndpoint remoteEndpoint)

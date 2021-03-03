@@ -1,8 +1,8 @@
 ﻿namespace Warden.Networking.Udp
 {
-    public class UdpClientConfiguration : UdpPeerConfiguration
+    public class UdpConfigurationClient : UdpConfigurationPeer
     {
-        public UdpClientConfiguration()
+        public UdpConfigurationClient()
         {
             autoMtuExpand = true;
         }

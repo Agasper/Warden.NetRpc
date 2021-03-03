@@ -5,7 +5,7 @@ using Warden.Util.Buffers;
 
 namespace Warden.Networking.Udp
 {
-    public class UdpPeerConfiguration
+    public class UdpConfigurationPeer
     {
         public enum TooLargeMessageBehaviour
         {
@@ -88,7 +88,7 @@ namespace Warden.Networking.Udp
                 callback, logger);
         }
 
-        public UdpPeerConfiguration()
+        public UdpConfigurationPeer()
         {
             syncronizationContext = new SynchronizationContext();
             tooLargeMessageBehaviour = TooLargeMessageBehaviour.RaiseException;

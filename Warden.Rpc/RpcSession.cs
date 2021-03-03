@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Warden.Logging;
 using Warden.Networking.IO;
-using Warden.Rpc.EventArgs;
+using Warden.Rpc.Events;
 using Warden.Rpc.Payload;
 using Warden.Util;
 

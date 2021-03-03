@@ -3,9 +3,7 @@ using Warden.Networking.IO;
 using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
 using Warden.Networking.Tcp.Messages;
-using Warden.Rpc.Net.Tcp.Events;
-
-//using static Warden.Rpc.Net.Tcp.RpcTcpServer;
+using Warden.Rpc.Net.Events;
 
 namespace Warden.Rpc.Net.Tcp
 {
@@ -14,11 +12,17 @@ namespace Warden.Rpc.Net.Tcp
         public RpcSession Session => session;
         
         RpcSession session;
-        readonly RpcTcpConfiguration configuration;
+        readonly RpcConfiguration configuration;
         readonly IRpcPeer rpcPeer;
 
-        internal RpcTcpConnection(TcpPeer parent, IRpcPeer rpcPeer, RpcTcpConfiguration configuration) : base(parent)
+        internal RpcTcpConnection(TcpPeer parent, IRpcPeer rpcPeer, RpcConfiguration configuration) : base(parent)
         {
+            if (parent == null)
+                throw new ArgumentNullException(nameof(parent));
+            if (rpcPeer == null)
+                throw new ArgumentNullException(nameof(rpcPeer));
+            if (configuration == null)
+                throw new ArgumentNullException(nameof(configuration));
             this.configuration = configuration;
             this.rpcPeer = rpcPeer;
         }
@@ -78,15 +82,21 @@ namespace Warden.Rpc.Net.Tcp
 
         protected override void OnMessageReceived(MessageEventArgs args)
         {
-            using (args.Message)
+            try
             {
-                using (WardenStreamReader sr = new WardenStreamReader(args.Message.BaseStream, true))
+                using (args.Message)
                 {
-                    session.OnMessage(sr);
+                    using (WardenStreamReader sr = new WardenStreamReader(args.Message.BaseStream, true))
+                    {
+                        session.OnMessage(sr);
+                    }
                 }
             }
-            
-            base.OnMessageReceived(args);
+            catch (Exception e)
+            {
+                logger.Error($"Unhandled exception in {nameof(RpcTcpConnection)}.{nameof(OnMessageReceived)}: {e}");
+                Close();
+            }
         }
 
         public bool SendReliable(ICustomMessage message)
@@ -104,7 +114,7 @@ namespace Warden.Rpc.Net.Tcp
             return true;
         }
 
-        protected virtual void SendRawMessage(TcpRawMessage message)
+        private protected virtual void SendRawMessage(TcpRawMessage message)
         {
             _ = this.SendMessageAsync(message);
         }

@@ -5,7 +5,7 @@ namespace Warden.Networking.Cryptography
 {
     public class Aes128Cipher : ICipher
     {
-        public int KeySize => cipher.KeySize / 8;
+        public int KeySize => cipher.KeySize;
         
         Aes cipher;
         bool keyInitialized = false;
@@ -23,8 +23,6 @@ namespace Warden.Networking.Cryptography
         {
             if (keyInitialized)
                 throw new InvalidOperationException("Key already initialized");
-            if (key.Length != KeySize)
-                throw new ArgumentException($"Wrong key length. Expected {KeySize} bytes");
             
             cipher.Key = key;
             cipher.IV = iv;

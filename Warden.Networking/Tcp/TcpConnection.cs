@@ -83,6 +83,8 @@ namespace Warden.Networking.Tcp
 
         public TcpConnection(TcpPeer parent)
         {
+            if (parent == null)
+                throw new ArgumentNullException(nameof(parent));
             this.latencySimulationRecvQueue = new ConcurrentQueue<DelayedMessage>();
             this.stashed = true;
             this.Statistics = new TcpConnectionStatistics();
@@ -458,7 +460,7 @@ namespace Warden.Networking.Tcp
         //    SendMessageAsync(message);
         //}
 
-        public Task SendMessageAsync(TcpRawMessage message)
+        public virtual Task SendMessageAsync(TcpRawMessage message)
         {
             return SendMessageAsync(message, TcpRawMessageOptions.None);
         }

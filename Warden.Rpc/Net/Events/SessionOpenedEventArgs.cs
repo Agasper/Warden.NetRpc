@@ -1,12 +1,12 @@
 ﻿using System;
-namespace Warden.Rpc.Net.Tcp.Events
+namespace Warden.Rpc.Net.Events
 {
-    public class SessionClosedEventArgs
+    public class SessionOpenedEventArgs
     {
         public RpcSession Session { get; private set; }
-        public RpcTcpConnection Connection { get; private set; }
+        public IRpcConnection Connection { get; private set; }
 
-        internal SessionClosedEventArgs(RpcSession session, RpcTcpConnection connection)
+        internal SessionOpenedEventArgs(RpcSession session, IRpcConnection connection)
         {
             if (session == null)
                 throw new ArgumentNullException(nameof(session));

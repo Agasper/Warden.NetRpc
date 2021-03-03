@@ -28,10 +28,11 @@ namespace Warden.Networking.Udp
         public UdpConnectionStatistics Statistics { get; private set; }
         public UdpConnectionStatus Status { get; private set; }
         public UdpNetEndpoint EndPoint { get; private set; }
+        public bool IsClientConnection { get; private set; }
         public object Tag { get; set; }
 
         UdpPeer peer;
-        ILogger logger;
+        protected readonly ILogger logger;
         ConcurrentDictionary<ChannelDescriptor, IChannel> channels;
 
         DateTime lastStatusChange;
@@ -51,6 +52,8 @@ namespace Warden.Networking.Udp
 
         public UdpConnection(UdpPeer peer)
         {
+            if (peer == null)
+                throw new ArgumentNullException(nameof(peer));
             Random rnd = new Random();
             this.ConnectionId = peer.GetNextConnectionId();
             this.Status = UdpConnectionStatus.Waiting;
@@ -85,7 +88,7 @@ namespace Warden.Networking.Udp
             }
         }
 
-        protected virtual void OnRawMessage(MessageInfo messageInfo)
+        protected virtual void OnMessageReceived(MessageInfo messageInfo)
         {
 
         }
@@ -181,8 +184,9 @@ namespace Warden.Networking.Udp
             UpdateTimeoutDeadline();
         }
 
-        internal void Init(UdpNetEndpoint udpNetEndpoint)
+        internal void Init(UdpNetEndpoint udpNetEndpoint, bool isClientConnection)
         {
+            this.IsClientConnection = isClientConnection;
             this.EndPoint = udpNetEndpoint;
             UpdateTimeoutDeadline();
             logger.Debug($"{this} initialized");
@@ -400,11 +404,11 @@ namespace Warden.Networking.Udp
             {
                 try
                 {
-                    OnRawMessage(new MessageInfo(message, deliveryType, channel));
+                    OnMessageReceived(new MessageInfo(message, deliveryType, channel));
                 }
                 catch(Exception ex)
                 {
-                    logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnRawMessage)}: {ex}");
+                    logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnMessageReceived)}: {ex}");
                 }
             }, logger);
         }
@@ -658,7 +662,7 @@ namespace Warden.Networking.Udp
                 {
                     messageInfo.Message.Dispose();
 
-                    if (peer.Configuration.TooLargeUnreliableMessageBehaviour == UdpPeerConfiguration.TooLargeMessageBehaviour.RaiseException)
+                    if (peer.Configuration.TooLargeUnreliableMessageBehaviour == UdpConfigurationPeer.TooLargeMessageBehaviour.RaiseException)
                         throw new ArgumentException("You couldn't send fragmented message throught unreliable channel. You message below MTU limit or change delivery type");
                     else
                         return UdpSendStatus.Failed;

@@ -10,7 +10,7 @@ namespace Warden.Networking.Udp
 {
     public class UdpServer : UdpPeer
     {
-        public new UdpServerConfiguration Configuration => configuration;
+        public new UdpConfigurationServer Configuration => configuration;
         public IReadOnlyDictionary<UdpNetEndpoint, UdpConnection> Connections
         {
             get
@@ -18,7 +18,7 @@ namespace Warden.Networking.Udp
                 return connections;
             }
         }
-        UdpServerConfiguration configuration;
+        UdpConfigurationServer configuration;
 
         private protected override ILogger Logger => logger;
 
@@ -26,14 +26,14 @@ namespace Warden.Networking.Udp
         ILogger logger;
         ConcurrentDictionary<UdpNetEndpoint, UdpConnection> connections;
 
-        public UdpServer(UdpServerConfiguration configuration) : base(configuration)
+        public UdpServer(UdpConfigurationServer configuration) : base(configuration)
         {
             this.configuration = configuration;
             this.connections = new ConcurrentDictionary<UdpNetEndpoint, UdpConnection>();
             this.logger = configuration.LogManager.GetLogger(nameof(UdpServer));
             this.logger.Meta["kind"] = this.GetType().Name;
         }
-
+        
         public virtual void Listen(int port)
         {
             CheckStarted();
@@ -81,7 +81,7 @@ namespace Warden.Networking.Udp
             UdpConnection newConnection = this.CreateConnection();
             try
             {
-                newConnection.Init(remoteEndpoint);
+                newConnection.Init(remoteEndpoint, false);
                 newConnection.OnDatagram(datagram);
             }
             catch(Exception ex)

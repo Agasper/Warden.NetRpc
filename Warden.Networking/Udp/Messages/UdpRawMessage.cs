@@ -1,5 +1,9 @@
 ﻿using System;
+using System.Security.Cryptography;
+using Warden.Networking.Cryptography;
+using Warden.Networking.IO;
 using Warden.Networking.Messages;
+using Warden.Networking.Tcp.Messages;
 using Warden.Util.Buffers;
 
 namespace Warden.Networking.Udp.Messages
@@ -47,6 +51,38 @@ namespace Warden.Networking.Udp.Messages
             this.Position = 0;
             this.CopyTo(datagram.BaseStream);
             return datagram;
+        }
+        
+        public UdpRawMessage Encrypt(ICipher cipher)
+        {
+            CheckDisposed();
+            using (var encryptor = cipher.CreateEncryptor())
+            {
+                UdpRawMessage encryptedMessage = new UdpRawMessage(this.memoryStreamPool, (int)this.stream.Length);
+                using (CryptoStream cryptoStream = new CryptoStream(new NonDisposableStream(encryptedMessage.BaseStream), encryptor, CryptoStreamMode.Write))
+                {
+                    this.stream.Position = 0;
+                    this.stream.CopyTo(cryptoStream);
+                    cryptoStream.FlushFinalBlock();
+                    return encryptedMessage;
+                }
+            }
+        }
+
+        public UdpRawMessage Decrypt(ICipher cipher)
+        {
+            CheckDisposed();
+            using (var encryptor = cipher.CreateDecryptor())
+            {
+                this.stream.Position = 0;
+                using (CryptoStream cryptoStream = new CryptoStream(new NonDisposableStream(this.stream), encryptor, CryptoStreamMode.Read))
+                {
+                    UdpRawMessage decryptedMessage = new UdpRawMessage(this.memoryStreamPool, (int)this.stream.Length);
+                    cryptoStream.CopyTo(decryptedMessage.BaseStream);
+                    decryptedMessage.BaseStream.Position = 0;
+                    return decryptedMessage;
+                }
+            }
         }
 
     }

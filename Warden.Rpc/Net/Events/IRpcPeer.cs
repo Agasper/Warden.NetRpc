@@ -1,4 +1,4 @@
-namespace Warden.Rpc.Net.Tcp.Events
+namespace Warden.Rpc.Net.Events
 {
     public interface IRpcPeer
     {

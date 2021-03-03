@@ -3,24 +3,24 @@ using System.Net;
 using System.Threading.Tasks;
 using Warden.Logging;
 using Warden.Networking.Cryptography;
-using Warden.Networking.Tcp;
-using Warden.Networking.Tcp.Events;
+using Warden.Networking.Udp;
+using Warden.Networking.Udp.Events;
 using Warden.Rpc.Net.Events;
 
-namespace Warden.Rpc.Net.Tcp
+namespace Warden.Rpc.Net.Udp
 {
-    public class RpcTcpClient : IRpcPeer
+    public class RpcUdpClient : IRpcPeer
     {
-        internal class InnerTcpClient : TcpClient
+        internal class InnerUdpClient : UdpClient
         {
-            RpcTcpClient parent;
+            RpcUdpClient parent;
 
-            public InnerTcpClient(RpcTcpClient parent, RpcTcpConfigurationClient configuration) : base(configuration.TcpConfiguration)
+            public InnerUdpClient(RpcUdpClient parent, RpcUdpConfigurationClient configuration) : base(configuration.UdpConfiguration)
             {
                 this.parent = parent;
             }
             
-            protected override TcpConnection CreateConnection()
+            protected override UdpConnection CreateConnection()
             {
                 return parent.CreateConnection();
             }
@@ -32,20 +32,20 @@ namespace Warden.Rpc.Net.Tcp
             }
         }
         
-        public RpcTcpConfigurationClient Configuration => configuration;
+        public RpcUdpConfigurationClient Configuration => configuration;
         public RpcSession Session { get; private set; }
-        public TcpConnection Connection => innerTcpClient?.Connection;
+        public UdpConnection Connection => innerUdpClient?.Connection;
         public bool Ready => Session != null;
         public event DOnSessionOpened OnSessionOpenedEvent;
         public event DOnSessionClosed OnSessionClosedEvent;
         
-        readonly InnerTcpClient innerTcpClient;
-        readonly RpcTcpConfigurationClient configuration;
+        readonly InnerUdpClient innerUdpClient;
+        readonly RpcUdpConfigurationClient configuration;
         protected readonly ILogger logger;
         
         TaskCompletionSource<SessionOpenedEventArgs> tcsSessionOpened;
 
-        public RpcTcpClient(RpcTcpConfigurationClient configuration)
+        public RpcUdpClient(RpcUdpConfigurationClient configuration)
         {
             if (configuration == null)
                 throw new ArgumentNullException(nameof(configuration));
@@ -53,19 +53,19 @@ namespace Warden.Rpc.Net.Tcp
                 throw new ArgumentNullException(nameof(configuration.Serializer));
             configuration.Lock();
             this.configuration = configuration;
-            this.innerTcpClient = new InnerTcpClient(this, configuration);
-            this.logger = configuration.LogManager.GetLogger(nameof(RpcTcpClient));
+            this.innerUdpClient = new InnerUdpClient(this, configuration);
+            this.logger = configuration.LogManager.GetLogger(nameof(RpcUdpClient));
             this.logger.Meta["kind"] = this.GetType().Name;
         }
         
         public void Start()
         {
-            innerTcpClient.Start();
+            innerUdpClient.Start();
         }
         
         public void Shutdown()
         {
-            innerTcpClient.Shutdown();
+            innerUdpClient.Shutdown();
         }
 
         public virtual async Task StartSession(string host, int port)
@@ -77,7 +77,7 @@ namespace Warden.Rpc.Net.Tcp
             try
             {
 
-                await innerTcpClient.ConnectAsync(host, port)
+                await innerUdpClient.ConnectAsync(host, port)
                     .ConfigureAwait(false);
                 var openedArgs = await tcsSessionOpened.Task
                     .ConfigureAwait(false);
@@ -102,7 +102,7 @@ namespace Warden.Rpc.Net.Tcp
 
             try
             {
-                await innerTcpClient.ConnectAsync(endpoint)
+                await innerUdpClient.ConnectAsync(endpoint)
                     .ConfigureAwait(false);
                 var openedArgs = await tcsSessionOpened.Task
                     .ConfigureAwait(false);
@@ -148,7 +148,7 @@ namespace Warden.Rpc.Net.Tcp
 
         public void CloseSession()
         {
-            innerTcpClient.Disconnect();
+            innerUdpClient.Disconnect();
         }
 
         RpcSession IRpcPeer.CreateSession(RpcSessionContext context)
@@ -164,20 +164,18 @@ namespace Warden.Rpc.Net.Tcp
             return configuration.SessionFactory.CreateSession(context);
         }
 
-        protected internal virtual RpcTcpConnection CreateConnection()
+        protected internal virtual RpcUdpConnection CreateConnection()
         {
-            RpcTcpConnection connection = null;
+            RpcUdpConnection connection = null;
             
             if (configuration.IsCipherSet)
             {
-                RpcTcpConnectionEncrypted encryptedConnection =
-                    new RpcTcpConnectionEncrypted(innerTcpClient, this, configuration);
-                encryptedConnection.SetCipher(configuration.CreateNewCipher());
-                connection = encryptedConnection;
+                connection =
+                    new RpcUdpConnectionEncrypted(innerUdpClient, configuration.CreateNewCipher(), this, configuration);
             }
             else
             {
-                connection = new RpcTcpConnection(innerTcpClient, this, configuration);
+                connection = new RpcUdpConnection(innerUdpClient, this, configuration);
             }
             return connection;
         }

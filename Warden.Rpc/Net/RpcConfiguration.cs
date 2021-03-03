@@ -5,9 +5,9 @@ using Warden.Logging;
 using Warden.Networking.Cryptography;
 using Warden.Rpc.Cryptography;
 
-namespace Warden.Rpc.Net.Tcp
+namespace Warden.Rpc.Net
 {
-    public class RpcTcpConfiguration
+    public class RpcConfiguration
     {
         internal TaskScheduler TaskScheduler { get => taskScheduler; set { CheckLocked(); taskScheduler = value; } }
         
@@ -71,7 +71,7 @@ namespace Warden.Rpc.Net.Tcp
             this.cipherFactory = new CipherFactory<T>();
         }
 
-        public RpcTcpConfiguration()
+        public RpcConfiguration()
         {
             remotingConfiguration = RemotingObjectConfiguration.Default;
             logManager = Logging.LogManager.Dummy;

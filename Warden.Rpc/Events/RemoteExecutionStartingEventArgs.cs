@@ -1,4 +1,4 @@
-namespace Warden.Rpc.EventArgs
+namespace Warden.Rpc.Events
 {
     public struct RemoteExecutionStartingEventArgs
     {

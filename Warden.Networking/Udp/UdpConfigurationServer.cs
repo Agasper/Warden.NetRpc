@@ -1,12 +1,12 @@
 ﻿namespace Warden.Networking.Udp
 {
-    public class UdpServerConfiguration : UdpPeerConfiguration
+    public class UdpConfigurationServer : UdpConfigurationPeer
     {
         public int MaximumConnections { get => maximumConnections; set { CheckLocked(); maximumConnections = value; } }
 
         int maximumConnections;
 
-        public UdpServerConfiguration()
+        public UdpConfigurationServer()
         {
             maximumConnections = int.MaxValue;
             autoMtuExpand = false;

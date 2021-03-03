@@ -2,7 +2,7 @@
 
 namespace Warden.Rpc.Net.Tcp
 {
-    public class RpcTcpConfigurationClient : RpcTcpConfiguration
+    public class RpcTcpConfigurationClient : RpcConfiguration
     {
         public TcpConfigurationClient TcpConfiguration => tcpConfiguration;
 

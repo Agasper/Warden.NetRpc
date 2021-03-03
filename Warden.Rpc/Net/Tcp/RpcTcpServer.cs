@@ -6,7 +6,7 @@ using Warden.Logging;
 using Warden.Networking.Cryptography;
 using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
-using Warden.Rpc.Net.Tcp.Events;
+using Warden.Rpc.Net.Events;
 
 namespace Warden.Rpc.Net.Tcp
 {

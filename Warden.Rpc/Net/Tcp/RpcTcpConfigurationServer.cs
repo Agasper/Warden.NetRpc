@@ -2,7 +2,7 @@
 
 namespace Warden.Rpc.Net.Tcp
 {
-    public class RpcTcpConfigurationServer : RpcTcpConfiguration
+    public class RpcTcpConfigurationServer : RpcConfiguration
     {
         public int MaxStashedConnections { get => maxStashedConnections; set { CheckLocked(); maxStashedConnections = value; } }
         public TcpConfigurationServer TcpConfiguration => tcpConfiguration;

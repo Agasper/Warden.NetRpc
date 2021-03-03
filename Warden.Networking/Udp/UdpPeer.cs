@@ -32,13 +32,13 @@ namespace Warden.Networking.Udp
 
         public object Tag { get; set; }
         public bool IsStarted => poller.IsStarted;
-        public UdpPeerConfiguration Configuration => configuration;
+        public UdpConfigurationPeer Configuration => configuration;
 
         private protected abstract ILogger Logger { get; }
 
         private protected bool IsBound => socket != null && socket.IsBound;
 
-        UdpPeerConfiguration configuration;
+        UdpConfigurationPeer configuration;
         Poller poller;
         Socket socket;
         IPEndPoint lastBoundTo;
@@ -48,7 +48,7 @@ namespace Warden.Networking.Udp
 
         ConcurrentQueue<DelayedDatagram> latencySimulationRecvBag;
 
-        public UdpPeer(UdpPeerConfiguration configuration)
+        public UdpPeer(UdpConfigurationPeer configuration)
         {
             this.socketArgsPool = new GenericPool<SocketAsyncEventArgs>(() =>
             {

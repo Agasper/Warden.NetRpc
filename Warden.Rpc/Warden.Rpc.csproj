@@ -27,7 +27,6 @@
     <Folder Include="Properties\" />
     <Folder Include="Net\" />
     <Folder Include="Net\Tcp\" />
-    <Folder Include="Net\Tcp\Events\" />
     <Folder Include="Net\Udp\" />
   </ItemGroup>
   <ItemGroup>
