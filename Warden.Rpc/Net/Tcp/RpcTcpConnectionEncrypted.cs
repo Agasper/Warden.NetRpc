@@ -21,6 +21,7 @@ namespace Warden.Rpc.Net.Tcp
         
         bool handshakeSend;
 
+        const ushort mark = 21078;
         readonly BigInteger mod = BigInteger.Parse("8344036200867339188401421868243599800768302958029168098393701372645433245359142296592083846452559047641776847523169623760010321326001893234240700419675989");
         
         ICipher cipher;
@@ -58,6 +59,7 @@ namespace Warden.Rpc.Net.Tcp
             var message = Parent.CreateMessage();
             using (WardenStreamWriter writer = new WardenStreamWriter(message.BaseStream, true))
             {
+                writer.Write(mark);
                 writer.Write(publicKeyBytes.Length);
                 writer.Write(publicKeyBytes);
                 byte[] clientModBytes = clientMod.ToByteArray();
@@ -83,6 +85,9 @@ namespace Warden.Rpc.Net.Tcp
                     {
                         using (WardenStreamReader reader = new WardenStreamReader(args.Message.BaseStream, false))
                         {
+                            ushort gotMark = reader.ReadUInt16();
+                            if (mark != gotMark)
+                                throw new InvalidOperationException("Handshake failed, wrong mark. Perhaps the other peer is trying to connect with unsecure connection");
                             int publicKeySize = reader.ReadInt32();
                             publicKey = new BigInteger(reader.ReadBytes(publicKeySize));
                             int clientModSize = reader.ReadInt32();

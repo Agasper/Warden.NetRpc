@@ -1,4 +1,5 @@
-﻿using Warden.Networking.IO;
+﻿using System;
+using Warden.Networking.IO;
 using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
 using Warden.Networking.Tcp.Messages;
@@ -29,8 +30,16 @@ namespace Warden.Rpc.Net.Tcp
 
         private protected virtual void InitSession()
         {
-            var session = CreateSession();
-            rpcPeer.OnSessionOpened(new SessionOpenedEventArgs(session, this));
+            try
+            {
+                var session = CreateSession();
+                rpcPeer.OnSessionOpened(new SessionOpenedEventArgs(session, this));
+            }
+            catch (Exception e)
+            {
+                logger.Error($"Failed to create {nameof(RpcSession)}, closing connection: {e}");
+                this.Close();
+            }
         }
 
         protected virtual RpcSession CreateSession()
@@ -52,6 +61,7 @@ namespace Warden.Rpc.Net.Tcp
             result.OrderedExecution = configuration.OrderedExecution;
             result.DefaultExecutionTimeout = configuration.DefaultExecutionTimeout;
             result.OrderedExecutionMaxQueue = configuration.OrderedExecutionMaxQueue;
+            result.RemotingObjectConfiguration = configuration.RemotingConfiguration;
 
             return result;
         }

@@ -9,6 +9,7 @@ namespace Warden.Rpc.Net.Udp
 {
     public class RpcUdpConnection : UdpConnection, IRpcConnectionAdvancedDelivery
     {
+        public long Id => base.EndPoint.ConnectionKey;
         public EndPoint RemoteEndpoint => base.EndPoint.EndPoint;
 
         RpcUdpServerConfiguration configuration;

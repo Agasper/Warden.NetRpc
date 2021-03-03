@@ -14,7 +14,6 @@ namespace Warden.Networking.Tcp
         public bool ReuseAddress { get => reuseAddress; set { CheckLocked(); reuseAddress = value; } }
         public MemoryStreamPool MemoryStreamPool { get => memoryStreamPool; set { CheckLocked(); CheckNull(value); memoryStreamPool = value; } }
         public int BufferSize { get => bufferSize; set { CheckLocked(); bufferSize = value; } }
-        public int MaxStashedConnections { get => maxStashedConnections; set { CheckLocked(); maxStashedConnections = value; } }
         public ILogManager LogManager { get => logManager; set { CheckLocked(); CheckNull(value); logManager = value; } }
 
         public bool KeepAliveEnabled { get => keepAliveEnabled; set { CheckLocked(); keepAliveEnabled = value; } }
@@ -27,7 +26,6 @@ namespace Warden.Networking.Tcp
 
         protected int bufferSize;
         protected bool noDelay;
-        protected int maxStashedConnections;
         protected MemoryStreamPool memoryStreamPool;
         protected LingerOption lingerOption;
         protected ILogManager logManager;
@@ -91,7 +89,6 @@ namespace Warden.Networking.Tcp
             noDelay = true;
             logManager = Logging.LogManager.Dummy;
             lingerOption = new LingerOption(true, 15);
-            maxStashedConnections = 128;
             keepAliveEnabled = true;
             keepAliveInterval = 1000;
             keepAliveTimeout = Timeout.Infinite;

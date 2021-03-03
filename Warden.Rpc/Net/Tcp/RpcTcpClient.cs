@@ -34,6 +34,7 @@ namespace Warden.Rpc.Net.Tcp
         
         public RpcTcpConfigurationClient Configuration => configuration;
         public RpcSession Session { get; private set; }
+        public TcpConnection Connection => innerTcpClient?.Connection;
         public bool Ready => Session != null;
         public event DOnSessionOpened OnSessionOpenedEvent;
         public event DOnSessionClosed OnSessionClosedEvent;
@@ -187,7 +188,7 @@ namespace Warden.Rpc.Net.Tcp
             tcsSessionOpened?.TrySetException(new InvalidOperationException("Connection closed prematurely"));
         }
 
-        void OnSessionOpened(SessionOpenedEventArgs args)
+        protected virtual void OnSessionOpened(SessionOpenedEventArgs args)
         {
             
         }
@@ -197,7 +198,7 @@ namespace Warden.Rpc.Net.Tcp
             tcsSessionOpened?.TrySetResult(args);
         }
 
-        void OnSessionClosed(SessionClosedEventArgs args)
+        protected virtual void OnSessionClosed(SessionClosedEventArgs args)
         {
             
         }

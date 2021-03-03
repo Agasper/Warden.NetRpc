@@ -6,12 +6,21 @@ using System.Threading.Tasks;
 
 namespace Warden.Rpc
 {
-    public class RemotingObjectConfiguration
+    public struct RemotingObjectConfiguration
     {
-        public bool AllowAsync { get; set; } = true;
-        public bool AllowNonVoid { get; set; } = true;
-        public bool AllowLambdaExpressions { get; set; } = true;
-        public bool AllowNonPublicMethods { get; set; } = true;
+        public bool AllowAsync { get; set; }
+        public bool AllowNonVoid { get; set; }
+        public bool AllowLambdaExpressions { get; set; }
+        public bool AllowNonPublicMethods { get; set; }
+
+        public static RemotingObjectConfiguration Default =>
+            new RemotingObjectConfiguration()
+            {
+                AllowAsync = true,
+                AllowLambdaExpressions = true,
+                AllowNonVoid = true,
+                AllowNonPublicMethods = true
+            };
     }
 
     public class RemotingObjectScheme

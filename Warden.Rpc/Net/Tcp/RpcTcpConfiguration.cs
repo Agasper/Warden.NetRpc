@@ -17,6 +17,7 @@ namespace Warden.Rpc.Net.Tcp
         public RpcSerializer Serializer { get => serializer; set { CheckLocked(); CheckNull(value); serializer = value; } }
         public ILogManager LogManager { get => logManager; set { CheckLocked(); CheckNull(value); logManager = value; } }
         public ISessionFactory SessionFactory { get => sessionFactory; set { CheckLocked(); CheckNull(value); sessionFactory = value; } }
+        public RemotingObjectConfiguration RemotingConfiguration { get => remotingConfiguration; set { CheckLocked(); CheckNull(value); remotingConfiguration = value; } }
 
         ICipherFactory cipherFactory;
         ISessionFactory sessionFactory;
@@ -26,6 +27,7 @@ namespace Warden.Rpc.Net.Tcp
         int orderedExecutionMaxQueue;
         RpcSerializer serializer;
         TaskScheduler taskScheduler;
+        RemotingObjectConfiguration remotingConfiguration;
         
         protected bool locked;
 
@@ -71,6 +73,7 @@ namespace Warden.Rpc.Net.Tcp
 
         public RpcTcpConfiguration()
         {
+            remotingConfiguration = RemotingObjectConfiguration.Default;
             logManager = Logging.LogManager.Dummy;
             defaultExecutionTimeout = 10000;
             orderedExecution = false;

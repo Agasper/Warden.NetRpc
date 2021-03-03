@@ -6,13 +6,11 @@ namespace Warden.Rpc.EventArgs
     {
         public ExecutionRequest Request { get; private set; }
         public RemotingException Exception { get; private set; }
-        public ExecutionOptions Options { get; private set; }
 
-        internal RemoteExecutionExceptionEventArgs(ExecutionRequest remotingRequest, RemotingException exception, ExecutionOptions options)
+        internal RemoteExecutionExceptionEventArgs(ExecutionRequest remotingRequest, RemotingException exception)
         {
             this.Request = remotingRequest;
             this.Exception = exception;
-            this.Options = options;
         }
     }
 }

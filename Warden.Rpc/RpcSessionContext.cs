@@ -12,7 +12,7 @@ namespace Warden.Rpc
         public TaskScheduler TaskScheduler { get; set; }
         public ILogManager LogManager { get; set; }
         public IRpcConnection Connection { get; set; }
-        public RemotingObjectConfiguration RemotingObjectConfiguration { get; set; } = new RemotingObjectConfiguration();
+        public RemotingObjectConfiguration RemotingObjectConfiguration { get; set; }
 
         public RpcSessionContext()
         {
@@ -20,6 +20,7 @@ namespace Warden.Rpc
             OrderedExecution = false;
             OrderedExecutionMaxQueue = 32;
             TaskScheduler = TaskScheduler.Default;
+            RemotingObjectConfiguration = RemotingObjectConfiguration.Default;
         }
     }
 }

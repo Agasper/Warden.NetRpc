@@ -4,8 +4,8 @@ namespace Warden.Rpc.Net.Tcp
 {
     public class RpcTcpConfigurationClient : RpcTcpConfiguration
     {
-        public TcpConfigurationClient TcpConfiguration { get => tcpConfiguration; set { CheckLocked(); CheckNull(value); tcpConfiguration = value; } }
-        
+        public TcpConfigurationClient TcpConfiguration => tcpConfiguration;
+
         TcpConfigurationClient tcpConfiguration;
 
         public override void CaptureSynchronizationContext()
