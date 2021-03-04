@@ -100,11 +100,6 @@ namespace Warden.Rpc
                 requests.Clear();
             }
 
-            this.remotingObject = null;
-            this.remotingObjectScheme = null;
-
-            this.logger.Debug($"{this} closed!");
-            
             try
             {
                 OnClose();
@@ -113,6 +108,12 @@ namespace Warden.Rpc
             {
                 logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnClose)}: {e}");
             }
+            
+            
+            this.remotingObject = null;
+            this.remotingObjectScheme = null;
+
+            this.logger.Debug($"{this} closed!");
             
             return true;
         }

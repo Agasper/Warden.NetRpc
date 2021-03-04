@@ -15,8 +15,9 @@ namespace Warden.Rpc.Net.Tcp
     {
         DiffieHellmanImpl dh;
         ICipher cipher;
-        
-        internal RpcTcpConnectionEncrypted(TcpPeer parent, IRpcPeer rpcPeer, RpcConfiguration configuration) : base(parent, rpcPeer, configuration)
+
+        internal RpcTcpConnectionEncrypted(TcpPeer parent, IRpcPeer rpcPeer, RpcConfiguration configuration) : base(
+            parent, rpcPeer, configuration)
         {
         }
 
@@ -47,50 +48,54 @@ namespace Warden.Rpc.Net.Tcp
 
         protected override void OnMessageReceived(MessageEventArgs args)
         {
-            try
+            using (args.Message)
             {
-                if (dh.Status == DiffieHellmanImpl.DhStatus.None)
+                try
                 {
-                    logger.Debug($"Got secure handshake request");
-                    var responseMessage = Parent.CreateMessage();
-                    dh.RecvHandshakeRequest(args.Message.BaseStream, responseMessage.BaseStream);
-                    _ = SendMessageAsync(responseMessage);
-                    logger.Debug($"Sent secure handshake response, common key set!");
-                    base.InitSession();
+                    if (dh.Status == DiffieHellmanImpl.DhStatus.None)
+                    {
+                        logger.Debug($"Got secure handshake request");
+                        var responseMessage = Parent.CreateMessage();
+                        dh.RecvHandshakeRequest(args.Message.BaseStream, responseMessage.BaseStream);
+                        _ = SendMessageAsync(responseMessage);
+                        logger.Debug($"Sent secure handshake response, common key set!");
+                        base.InitSession();
+                        return;
+                    }
+
+                    if (dh.Status == DiffieHellmanImpl.DhStatus.WaitingForServerMod)
+                    {
+                        dh.RecvHandshakeResponse(args.Message.BaseStream);
+                        logger.Debug($"Got secure handshake response, common key set!");
+                        base.InitSession();
+                        return;
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    logger.Error($"Handshake failed for {this}. Closing... {e}");
+                    Close();
                     return;
                 }
 
-                if (dh.Status == DiffieHellmanImpl.DhStatus.WaitingForServerMod)
-                {
-                    dh.RecvHandshakeResponse(args.Message.BaseStream);
-                    logger.Debug($"Got secure handshake response, common key set!");
-                    base.InitSession();
-                    return;
-                }
-            }
-            catch (Exception e)
-            {
-                logger.Error($"Handshake failed for {this}. Closing... {e}");
-                Close();
-                return;
-            }
-
-            try
-            {
-                using (args.Message)
+                try
                 {
                     using (var decryptedMessage = args.Message.Decrypt(cipher))
                     {
                         base.OnMessageReceived(new MessageEventArgs(this, decryptedMessage));
                     }
+
+                }
+                catch (Exception e)
+                {
+                    logger.Error(
+                        $"Unhandled exception in {nameof(RpcTcpConnectionEncrypted)}.{nameof(OnMessageReceived)}: {e}");
+                    Close();
                 }
             }
-            catch (Exception e)
-            {
-                logger.Error($"Unhandled exception in {nameof(RpcTcpConnectionEncrypted)}.{nameof(OnMessageReceived)}: {e}");
-                Close();
-            }
         }
+
 
         private protected override void SendRawMessage(TcpRawMessage message)
         {
