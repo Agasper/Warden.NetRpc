@@ -33,10 +33,8 @@ namespace Warden.Networking.Tcp
         long connectionId;
         Socket clientSocket;
         ILogger logger;
-        bool canReconnect;
-
-        DateTime reconnectTimerStartFrom;
-        IPEndPoint lastEndpoint;
+        
+        protected IPEndPoint lastEndpoint;
 
         public TcpClient(TcpConfigurationClient configuration) : base(configuration)
         {
@@ -52,10 +50,6 @@ namespace Warden.Networking.Tcp
         {
             if (status == newStatus)
                 return;
-
-
-            if (newStatus == TcpConnectionStatus.Disconnected)
-                reconnectTimerStartFrom = DateTime.UtcNow;
 
             status = newStatus;
 
@@ -83,38 +77,16 @@ namespace Warden.Networking.Tcp
             }, logger);
         }
 
-        protected override void PollEventsInternal()
+        private protected override void PollEventsInternal()
         {
             Connection?.PollEventsInternal();
-
-            if (status == TcpConnectionStatus.Disconnected &&
-                IsStarted &&
-                canReconnect &&
-                configuration.AutoReconnect &&
-                (DateTime.UtcNow - reconnectTimerStartFrom).TotalMilliseconds > configuration.AutoReconnectDelay)
-            {
-                if (!OnReconnecting())
-                {
-                    reconnectTimerStartFrom = DateTime.UtcNow;
-                }
-                else
-                {
-                    logger.Info($"Reconnecting to {lastEndpoint}...");
-                    _ = ConnectAsync(lastEndpoint);
-                }
-            }
         }
 
         protected virtual void OnStatusChanged(ClientStatusChangedEventArgs args)
         {
 
         }
-
-        protected virtual bool OnReconnecting()
-        {
-            return true;
-        }
-
+        
         public async Task ConnectAsync(string host, int port)
         {
             IPAddress ip = IPAddress.Any;
@@ -160,7 +132,6 @@ namespace Warden.Networking.Tcp
                 
                 this.Connection = connection;
                 ChangeStatus(TcpConnectionStatus.Connected);
-                canReconnect = true;
             }
             catch
             {
@@ -211,9 +182,8 @@ namespace Warden.Networking.Tcp
             ChangeStatus(TcpConnectionStatus.Disconnected);
         }
 
-        public void Disconnect(bool stopAutoReconnecting = true)
+        public void Disconnect()
         {
-            canReconnect = !stopAutoReconnecting;
             DisconnectInternal();
         }
     }

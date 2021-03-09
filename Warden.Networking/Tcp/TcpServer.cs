@@ -67,7 +67,7 @@ namespace Warden.Networking.Tcp
             connections.Clear();
         }
 
-        protected override void PollEventsInternal()
+        private protected override void PollEventsInternal()
         {
             foreach(var pair in connections)
                 pair.Value?.PollEventsInternal();

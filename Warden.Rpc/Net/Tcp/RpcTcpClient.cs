@@ -9,17 +9,26 @@ using Warden.Rpc.Net.Events;
 
 namespace Warden.Rpc.Net.Tcp
 {
+    public enum RpcClientStatus
+    {
+        Disconnected,
+        Connecting,
+        Ready
+    }
+    
     public class RpcTcpClient : IRpcPeer
     {
         internal class InnerTcpClient : TcpClient
         {
+            public IPEndPoint LastEndpoint => base.lastEndpoint;
             RpcTcpClient parent;
 
-            public InnerTcpClient(RpcTcpClient parent, RpcTcpConfigurationClient configuration) : base(configuration.TcpConfiguration)
+            public InnerTcpClient(RpcTcpClient parent, RpcTcpConfigurationClient configuration) : base(configuration
+                .TcpConfiguration)
             {
                 this.parent = parent;
             }
-            
+
             protected override TcpConnection CreateConnection()
             {
                 return parent.CreateConnection();
@@ -30,18 +39,28 @@ namespace Warden.Rpc.Net.Tcp
                 parent.OnConnectionClosedInternal(args);
                 base.OnConnectionClosed(args);
             }
+
+            protected override void PollEvents()
+            {
+                parent.PollEvents();
+                base.PollEvents();
+            }
         }
-        
+
         public RpcTcpConfigurationClient Configuration => configuration;
         public RpcSession Session { get; private set; }
-        public TcpConnection Connection => innerTcpClient?.Connection;
-        public bool Ready => Session != null;
+        public TcpConnectionStatistics Statistics => innerTcpClient?.Connection?.Statistics;
+        public RpcClientStatus Status { get; private set; }
         public event DOnSessionOpened OnSessionOpenedEvent;
         public event DOnSessionClosed OnSessionClosedEvent;
+        public event DOnClientStatusChanged OnStatusChangedEvent;
         
         readonly InnerTcpClient innerTcpClient;
         readonly RpcTcpConfigurationClient configuration;
         protected readonly ILogger logger;
+        
+        bool canReconnect;
+        DateTime reconnectTimerStartFrom;
         
         TaskCompletionSource<SessionOpenedEventArgs> tcsSessionOpened;
 
@@ -70,50 +89,59 @@ namespace Warden.Rpc.Net.Tcp
 
         public virtual async Task StartSession(string host, int port)
         {
-            if (Session != null)
-                throw new InvalidOperationException("Session already started");
+            if (Status != RpcClientStatus.Disconnected)
+                throw new InvalidOperationException($"Wrong status {Status}, expected {RpcClientStatus.Disconnected}");
             
             this.tcsSessionOpened = new TaskCompletionSource<SessionOpenedEventArgs>();
             try
             {
-
+                logger.Trace($"Connecting to {host}:{port}");
+                ChangeStatus(RpcClientStatus.Connecting);
                 await innerTcpClient.ConnectAsync(host, port)
                     .ConfigureAwait(false);
+                logger.Trace($"Waiting for session...");
                 var openedArgs = await tcsSessionOpened.Task
                     .ConfigureAwait(false);
+                logger.Trace($"Waiting for auth...");
                 await Authenticate(openedArgs).ConfigureAwait(false);
-
                 OnSessionStarted(openedArgs);
+                ChangeStatus(RpcClientStatus.Ready);
+                canReconnect = true;
             }
             catch (Exception ex)
             {
                 logger.Error($"Exception on establishing session: {ex}");
-                this.CloseSession();
+                this.CloseSessionInternal();
                 throw;
             }
         }
 
         public virtual async Task StartSession(IPEndPoint endpoint)
         {
-            if (Session != null)
-                throw new InvalidOperationException("Session already started");
+            if (Status != RpcClientStatus.Disconnected)
+                throw new InvalidOperationException($"Wrong status {Status}, expected {RpcClientStatus.Disconnected}");
             
             this.tcsSessionOpened = new TaskCompletionSource<SessionOpenedEventArgs>();
 
             try
             {
+                logger.Trace($"Connecting to {endpoint}");
+                ChangeStatus(RpcClientStatus.Connecting);
                 await innerTcpClient.ConnectAsync(endpoint)
                     .ConfigureAwait(false);
+                logger.Trace($"Waiting for session...");
                 var openedArgs = await tcsSessionOpened.Task
                     .ConfigureAwait(false);
+                logger.Trace($"Waiting for auth...");
                 await Authenticate(openedArgs).ConfigureAwait(false);;
-                
                 OnSessionStarted(openedArgs);
+                ChangeStatus(RpcClientStatus.Ready);
+                canReconnect = true;
             }
             catch (Exception ex)
             {
-                this.CloseSession();
                 logger.Error($"Exception on establishing session: {ex}");
+                this.CloseSessionInternal();
                 throw;
             }
         }
@@ -146,9 +174,17 @@ namespace Warden.Rpc.Net.Tcp
             return Task.CompletedTask;
         }
 
-        public void CloseSession()
+        void CloseSessionInternal()
         {
             innerTcpClient.Disconnect();
+            reconnectTimerStartFrom = DateTime.UtcNow;
+            ChangeStatus(RpcClientStatus.Disconnected);
+        }
+
+        public void CloseSession(bool stopAutoReconnecting = true)
+        {
+            CloseSessionInternal();
+            canReconnect = !stopAutoReconnecting;
         }
 
         RpcSession IRpcPeer.CreateSession(RpcSessionContext context)
@@ -202,8 +238,42 @@ namespace Warden.Rpc.Net.Tcp
             
         }
         
+        protected virtual void OnStatusChanged(RpcClientStatusChangedEventArgs args)
+        {
+            
+        }
+
+        void ChangeStatus(RpcClientStatus newStatus)
+        {
+            if (Status == newStatus)
+                return;
+            logger.Debug($"Changed status from {Status} to {newStatus}");
+            RpcClientStatusChangedEventArgs args = new RpcClientStatusChangedEventArgs(this, Status, newStatus);
+            Status = newStatus;
+            
+            try
+            {
+                OnStatusChanged(args);
+            }
+            catch (Exception e)
+            {
+                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnStatusChanged)}: {e}");
+            }
+            
+            try
+            {
+                OnStatusChangedEvent?.Invoke(args);
+            }
+            catch (Exception e)
+            {
+                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnStatusChangedEvent)}: {e}");
+            }
+        }
+        
         void IRpcPeer.OnSessionClosed(SessionClosedEventArgs args)
         {
+            reconnectTimerStartFrom = DateTime.UtcNow;
+            ChangeStatus(RpcClientStatus.Disconnected);
             this.Session = null;
             
             try
@@ -222,6 +292,30 @@ namespace Warden.Rpc.Net.Tcp
             catch (Exception e)
             {
                 logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionClosedEvent)}: {e}");
+            }
+        }
+        
+        protected virtual bool OnReconnecting()
+        {
+            return true;
+        }
+
+        internal void PollEvents()
+        {
+            if (Status == RpcClientStatus.Disconnected &&
+                canReconnect &&
+                configuration.AutoReconnect &&
+                (DateTime.UtcNow - reconnectTimerStartFrom).TotalMilliseconds > configuration.AutoReconnectDelay)
+            {
+                if (!OnReconnecting())
+                {
+                    reconnectTimerStartFrom = DateTime.UtcNow;
+                }
+                else
+                {
+                    logger.Info($"Reconnecting to {innerTcpClient.LastEndpoint}...");
+                    _ = StartSession(innerTcpClient.LastEndpoint);
+                }
             }
         }
     }

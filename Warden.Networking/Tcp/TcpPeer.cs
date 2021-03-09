@@ -180,6 +180,7 @@ namespace Warden.Networking.Tcp
             try
             {
                 PollEventsInternal();
+                PollEvents();
             }
             catch(Exception ex)
             {
@@ -188,7 +189,12 @@ namespace Warden.Networking.Tcp
             }
         }
 
-        protected virtual void PollEventsInternal()
+        protected virtual void PollEvents()
+        {
+            
+        }
+
+        private protected virtual void PollEventsInternal()
         {
             
         }

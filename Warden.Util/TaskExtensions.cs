@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -44,6 +45,7 @@ namespace Warden.Util
                 cts.CancelAfter(millisecondsTimeout);
 
                 TaskCompletionSource<TResult> tcs = new TaskCompletionSource<TResult>();
+                
                 _ = task.ContinueWith((t, state) =>
                 {
                     MarshalTaskResults(t, state as TaskCompletionSource<TResult>);
@@ -65,7 +67,10 @@ namespace Warden.Util
             switch (source.Status)
             {
                 case TaskStatus.Faulted:
-                    proxy.TrySetException(source.Exception);
+                    if (source.Exception.InnerExceptions.Count == 1)
+                        proxy.TrySetException(source.Exception.InnerExceptions.First());
+                    else
+                        proxy.TrySetException(source.Exception);
                     break;
                 case TaskStatus.Canceled:
                     proxy.TrySetCanceled();
