@@ -9,20 +9,6 @@
     <ProjectReference Include="..\Warden.Networking\Warden.Networking.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Google.Protobuf">
-      <HintPath>..\Libs\Protobuf3.12.x\Google.Protobuf.dll</HintPath>
-    </Reference>
-    <Reference Include="Google.Protobuf">
-      <HintPath>..\..\..\Warden\LibraryPod\Libs\Protobuf3.13.0\Google.Protobuf.dll</HintPath>
-    </Reference>
-    <Reference Include="Google.Protobuf">
-      <HintPath>..\..\..\Warden\LibraryPod\Libs\Protobuf3.13.0\netstandard2.0\Google.Protobuf.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Memory">
-      <HintPath>..\Libs\System.Memory.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
     <Folder Include="Payload\" />
     <Folder Include="Properties\" />
     <Folder Include="Net\" />
@@ -34,5 +20,13 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Buffers" Version="4.5.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Google.Protobuf, Version=3.13.0.0, Culture=neutral, PublicKeyToken=a7d26565bac4d604">
+      <HintPath>..\Libs\Protobuf3.13.0\netstandard2.0\Google.Protobuf.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Memory, Version=4.0.1.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51">
+      <HintPath>..\Libs\System.Memory.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>
