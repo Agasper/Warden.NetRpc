@@ -502,7 +502,7 @@ namespace Warden.Networking.Tcp
             {
                 var socket = this.socket;
                 if (!Connected)
-                    throw new OperationCanceledException("Send operation cancelled. Connection not established");
+                    return; // throw new OperationCanceledException("Send operation cancelled. Connection not established");
 
                 await sendSemaphore.WaitAsync().ConfigureAwait(false);
 
