@@ -87,7 +87,7 @@ namespace Warden.Rpc.Net.Tcp
             innerTcpClient.Shutdown();
         }
 
-        public virtual async Task StartSession(string host, int port)
+        public virtual async Task StartSessionAsync(string host, int port)
         {
             if (Status != RpcClientStatus.Disconnected)
                 throw new InvalidOperationException($"Wrong status {Status}, expected {RpcClientStatus.Disconnected}");
@@ -97,13 +97,11 @@ namespace Warden.Rpc.Net.Tcp
             {
                 logger.Trace($"Connecting to {host}:{port}");
                 ChangeStatus(RpcClientStatus.Connecting);
-                await innerTcpClient.ConnectAsync(host, port)
-                    .ConfigureAwait(false);
+                await innerTcpClient.ConnectAsync(host, port);
                 logger.Trace($"Waiting for session...");
-                var openedArgs = await tcsSessionOpened.Task
-                    .ConfigureAwait(false);
+                var openedArgs = await tcsSessionOpened.Task;
                 logger.Trace($"Waiting for auth...");
-                await Authenticate(openedArgs).ConfigureAwait(false);
+                await Authenticate(openedArgs);
                 OnSessionStarted(openedArgs);
                 ChangeStatus(RpcClientStatus.Ready);
                 canReconnect = true;
@@ -116,7 +114,7 @@ namespace Warden.Rpc.Net.Tcp
             }
         }
 
-        public virtual async Task StartSession(IPEndPoint endpoint)
+        public virtual async Task StartSessionAsync(IPEndPoint endpoint)
         {
             if (Status != RpcClientStatus.Disconnected)
                 throw new InvalidOperationException($"Wrong status {Status}, expected {RpcClientStatus.Disconnected}");
@@ -127,13 +125,11 @@ namespace Warden.Rpc.Net.Tcp
             {
                 logger.Trace($"Connecting to {endpoint}");
                 ChangeStatus(RpcClientStatus.Connecting);
-                await innerTcpClient.ConnectAsync(endpoint)
-                    .ConfigureAwait(false);
+                await innerTcpClient.ConnectAsync(endpoint);
                 logger.Trace($"Waiting for session...");
-                var openedArgs = await tcsSessionOpened.Task
-                    .ConfigureAwait(false);
+                var openedArgs = await tcsSessionOpened.Task;
                 logger.Trace($"Waiting for auth...");
-                await Authenticate(openedArgs).ConfigureAwait(false);;
+                await Authenticate(openedArgs);
                 OnSessionStarted(openedArgs);
                 ChangeStatus(RpcClientStatus.Ready);
                 canReconnect = true;
@@ -272,10 +268,6 @@ namespace Warden.Rpc.Net.Tcp
         
         void IRpcPeer.OnSessionClosed(SessionClosedEventArgs args)
         {
-            reconnectTimerStartFrom = DateTime.UtcNow;
-            ChangeStatus(RpcClientStatus.Disconnected);
-            this.Session = null;
-            
             try
             {
                 OnSessionClosed(args);
@@ -293,6 +285,11 @@ namespace Warden.Rpc.Net.Tcp
             {
                 logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionClosedEvent)}: {e}");
             }
+            
+            ChangeStatus(RpcClientStatus.Disconnected);
+            
+            reconnectTimerStartFrom = DateTime.UtcNow;
+            this.Session = null;
         }
         
         protected virtual bool OnReconnecting()
@@ -314,7 +311,7 @@ namespace Warden.Rpc.Net.Tcp
                 else
                 {
                     logger.Info($"Reconnecting to {innerTcpClient.LastEndpoint}...");
-                    _ = StartSession(innerTcpClient.LastEndpoint);
+                    _ = StartSessionAsync(innerTcpClient.LastEndpoint);
                 }
             }
         }

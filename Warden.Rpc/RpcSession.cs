@@ -85,10 +85,9 @@ namespace Warden.Rpc
         {
             if (closed)
                 return false;
+            closed = true;
             
             Connection.Close();
-            
-            closed = true;
 
             lock (requestsMutex)
             {
@@ -138,7 +137,12 @@ namespace Warden.Rpc
         {
             try
             {
-                CheckClosed();
+                if (closed)
+                {
+                    logger.Debug("Got message when closed. Ignoring...");
+                    return;
+                }
+
                 MessageType messageType = (MessageType) reader.ReadByte();
                 ReadFormatterInfo readFormatterInfo = new ReadFormatterInfo(reader, rpcSerializer);
                 switch (messageType)
@@ -168,7 +172,7 @@ namespace Warden.Rpc
             }
             catch (Exception outerException)
             {
-                logger.Error($"Closing connection due to unhandled exception on {this.GetType().Name}.{nameof(OnMessage)}(): {outerException}");
+                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnMessage)}(): {outerException}");
                 Connection.Close();
             }
         }
@@ -279,7 +283,7 @@ namespace Warden.Rpc
                     new LocalExecutionCompletedEventArgs(executionRequest, executionResponse, ms);
                 OnLocalExecutionCompleted(eventArgsCompleted);
                 
-                SendMessage(response);
+                SendMessage(response, false);
             }
             catch (Exception ex)
             {
@@ -316,7 +320,7 @@ namespace Warden.Rpc
                     remotingRequest.MethodKey,
                     exception);
 
-            SendMessage(remotingResponseError);
+            SendMessage(remotingResponseError, false);
 
             try
             {
@@ -421,11 +425,16 @@ namespace Warden.Rpc
             return executionTask;
         }
 
-        protected internal void SendMessage(ICustomMessage message)
+        protected internal void SendMessage(ICustomMessage message, bool throwIfFailed)
         {
             this.logger.Trace($"{this} sending {message}");
             if (!this.Connection.SendReliable(message))
-                throw new RemotingException("Transport connection is closed");
+            {
+                if (throwIfFailed)
+                    throw new RemotingException("Transport connection is closed");
+                else
+                    logger.Debug($"Couldn't send {message}, transport connection is closed");
+            }
         }
 
         async Task SendAndWait(RemotingRequest request, ExecutionOptions options)
@@ -435,7 +444,7 @@ namespace Warden.Rpc
                 this.logger.Debug($"Executing {request} remotely with {options}");
                 ExecutionRequest executionRequest = new ExecutionRequest(request);
                 OnRemoteExecutionStarting(new RemoteExecutionStartingEventArgs(executionRequest, options));
-                SendMessage(request);
+                SendMessage(request, true);
                 int timeout = defaultExecutionTimeout;
                 if (options.Timeout > Timeout.Infinite)
                     timeout = options.Timeout;
@@ -523,7 +532,7 @@ namespace Warden.Rpc
             RemotingRequest request = GetRequest(methodIdentity, false);
             request.HasArgument = false;
             this.logger.Debug($"Sending {request}");
-            SendMessage(request);
+            SendMessage(request, true);
         }
 
         public virtual void Send<T>(int methodIdentity, T arg) => SendInternal(methodIdentity, arg, SendingOptions.Default);
@@ -538,7 +547,7 @@ namespace Warden.Rpc
             request.HasArgument = true;
             request.Argument = arg;
             this.logger.Debug($"Sending {request}");
-            SendMessage(request);
+            SendMessage(request, true);
         }
     }
 }
