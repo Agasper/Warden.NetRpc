@@ -7,7 +7,7 @@ namespace Warden.Rpc.Events
         public ExecutionOptions Options { get; private set; }
         public float ElapsedMilliseconds { get; private set; }
         
-        internal RemoteExecutionCompletedEventArgs(ExecutionRequest remotingRequest, ExecutionResponse response, ExecutionOptions options, float elapsedMilliseconds)
+        public RemoteExecutionCompletedEventArgs(ExecutionRequest remotingRequest, ExecutionResponse response, ExecutionOptions options, float elapsedMilliseconds)
         {
             this.Request = remotingRequest;
             this.Response = response;

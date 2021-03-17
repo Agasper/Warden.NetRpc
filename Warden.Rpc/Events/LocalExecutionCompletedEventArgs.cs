@@ -6,7 +6,7 @@ namespace Warden.Rpc.Events
         public ExecutionResponse Response { get; private set; }
         public float ElapsedMilliseconds { get; private set; }
         
-        internal LocalExecutionCompletedEventArgs(ExecutionRequest request, ExecutionResponse response, float elapsedMilliseconds)
+        public LocalExecutionCompletedEventArgs(ExecutionRequest request, ExecutionResponse response, float elapsedMilliseconds)
         {
             this.Request = request;
             this.Response = response;

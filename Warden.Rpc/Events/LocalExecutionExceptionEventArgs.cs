@@ -7,7 +7,7 @@ namespace Warden.Rpc.Events
         public RemotingException Exception { get; private set; }
         public ExecutionRequest Request { get; private set; }
         
-        internal LocalExecutionExceptionEventArgs(RemotingException exception, ExecutionRequest request) : this()
+        public LocalExecutionExceptionEventArgs(RemotingException exception, ExecutionRequest request) : this()
         {
             this.Exception = exception;
             this.Request = request;

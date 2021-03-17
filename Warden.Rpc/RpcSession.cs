@@ -64,6 +64,10 @@ namespace Warden.Rpc
             this.defaultExecutionTimeout = sessionContext.DefaultExecutionTimeout;
             this.logger = sessionContext.LogManager.GetLogger(nameof(RpcSession));
             this.logger.Meta["kind"] = this.GetType().Name;
+            this.logger.Meta["connection_id"] = this.Connection.Id;
+            this.logger.Meta["connection_endpoint"] = new RefLogLabel<IRpcConnection>(this.Connection, s => s.RemoteEndpoint);
+            this.logger.Meta["closed"] = new RefLogLabel<RpcSession>(this, s => s.closed);
+            this.logger.Meta["tag"] = new RefLogLabel<RpcSession>(this, s => s.Tag);
             this.logger.Debug($"{sessionContext.Connection} created {this}");
         }
 
@@ -112,7 +116,7 @@ namespace Warden.Rpc
             this.remotingObject = null;
             this.remotingObjectScheme = null;
 
-            this.logger.Debug($"{this} closed!");
+            this.logger.Debug($"Closed!");
             
             return true;
         }
@@ -139,7 +143,7 @@ namespace Warden.Rpc
             {
                 if (closed)
                 {
-                    logger.Debug("Got message when closed. Ignoring...");
+                    logger.Debug($"Got message when closed. Ignoring...");
                     return;
                 }
 
@@ -180,7 +184,7 @@ namespace Warden.Rpc
 
         protected internal void LogMessageReceived(ICustomMessage message)
         {
-            this.logger.Trace($"{this} received {message}");
+            this.logger.Trace($"Received {message}");
         }
 
         public override string ToString()
@@ -193,7 +197,7 @@ namespace Warden.Rpc
             bool exists = requests.TryRemove(remotingResponseError.RequestId, out RemotingRequest remotingRequest);
             if (!exists)
             {
-                logger.Warn($"{this} got response error for unknown request id {remotingResponseError.RequestId}");
+                logger.Warn($"Got response error for unknown request id {remotingResponseError.RequestId}");
                 return;
             }
             
@@ -206,7 +210,7 @@ namespace Warden.Rpc
             bool exists = requests.TryRemove(remotingResponse.RequestId, out RemotingRequest remotingRequest);
             if (!exists)
             {
-                logger.Warn($"{this} got response for unknown request id {remotingResponse.RequestId}");
+                logger.Warn($"Got response for unknown request id {remotingResponse.RequestId}");
                 return;
             }
 
@@ -307,7 +311,7 @@ namespace Warden.Rpc
             }
             catch (Exception ex)
             {
-                logger.Error($"{this} got an unhandled exception in OnRemoteExecutionException(): {ex}");
+                logger.Error($"Got an unhandled exception in OnRemoteExecutionException(): {ex}");
             }
         }
         
@@ -330,7 +334,7 @@ namespace Warden.Rpc
             }
             catch (Exception ex)
             {
-                logger.Error($"{this} got an unhandled exception in {nameof(OnLocalExecutionException)}(): {ex}");
+                logger.Error($"Got an unhandled exception in {nameof(OnLocalExecutionException)}(): {ex}");
             }
         }
         
@@ -377,7 +381,7 @@ namespace Warden.Rpc
         protected virtual async Task<ExecutionResponse> ExecuteRequestAsync(ExecutionRequest request)
         {
             if (remotingObjectScheme == null || remotingObject == null)
-                throw new NullReferenceException("RpcSession isn't initialized properly. Remoting object is null");
+                throw new NullReferenceException($"{nameof(RpcSession)} isn't initialized properly. Remoting object is null");
 
             var container = remotingObjectScheme.GetInvocationContainer(request.MethodKey);
 
@@ -427,7 +431,7 @@ namespace Warden.Rpc
 
         protected internal void SendMessage(ICustomMessage message, bool throwIfFailed)
         {
-            this.logger.Trace($"{this} sending {message}");
+            this.logger.Trace($"Sending {message}");
             if (!this.Connection.SendReliable(message))
             {
                 if (throwIfFailed)
@@ -448,7 +452,7 @@ namespace Warden.Rpc
                 int timeout = defaultExecutionTimeout;
                 if (options.Timeout > Timeout.Infinite)
                     timeout = options.Timeout;
-                await RemoteExecutionWrapper(request, options,request.WaitAsync(timeout)).ConfigureAwait(false);
+                await RemoteExecutionWrapper(request, options, request.WaitAsync(timeout)).ConfigureAwait(false);
                 float ms = request.Response.ExecutionTime / (float) TimeSpan.TicksPerMillisecond;
                 this.logger.Debug($"Executed {request} remotely in {ms.ToString("0.00")}ms");
                 OnRemoteExecutionCompleted(new RemoteExecutionCompletedEventArgs(executionRequest,

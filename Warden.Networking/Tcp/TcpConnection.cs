@@ -95,6 +95,11 @@ namespace Warden.Networking.Tcp
             this.Parent = parent;
             this.logger = parent.Configuration.LogManager.GetLogger(nameof(TcpConnection));
             this.logger.Meta["kind"] = this.GetType().Name;
+            this.logger.Meta["connection_endpoint"] = new RefLogLabel<TcpConnection>(this, v => v.RemoteEndpoint);
+            this.logger.Meta["connected"] = new RefLogLabel<TcpConnection>(this, s => s.Connected);
+            this.logger.Meta["closed"] = new RefLogLabel<TcpConnection>(this, s => s.closed);
+
+            // return $"{nameof(TcpConnection)}[id={Id}, connected={Connected}, endpoint={RemoteEndpoint}]";
         }
 
         internal void CheckParent(TcpPeer parent)
@@ -119,7 +124,7 @@ namespace Warden.Networking.Tcp
             this.sendTask = Task.CompletedTask;
             this.closed = false;
             this.Started = DateTime.UtcNow;
-            logger.Info($"Connection initialized {this}");
+            logger.Info($"Connection #{Id} initialized");
             
             Parent.OnConnectionOpenedInternal(this);
         }
@@ -151,7 +156,7 @@ namespace Warden.Networking.Tcp
                 removed.message.Dispose();
 
             stashed = true;
-            logger.Debug($"{this} stashed!");
+            logger.Debug($"Connection #{Id} stashed!");
         }
 
         /// <summary>
@@ -179,7 +184,7 @@ namespace Warden.Networking.Tcp
                 sendSemaphore = null;
             }
 
-            logger.Debug($"{this} disposed!");
+            logger.Debug($"Connection #{Id} disposed!");
         }
 
         public void Dispose()
@@ -226,7 +231,7 @@ namespace Warden.Networking.Tcp
             
             try
             {
-                logger.Debug($"{this} closing!");
+                logger.Debug($"Connection #{Id} closing!");
                 
                 var socket_ = socket;
                 if (socket_ != null)
@@ -242,7 +247,7 @@ namespace Warden.Networking.Tcp
                     }
                 }
                 
-                logger.Info($"{this} closed!");
+                logger.Info($"Connection #{Id} closed!");
 
                 Parent.OnConnectionClosedInternal(this);
                 
@@ -271,7 +276,7 @@ namespace Warden.Networking.Tcp
                 }
 
                 Statistics.BytesIn(bytesRead);
-                logger.Trace($"{this} recv data {bytesRead} bytes");
+                logger.Trace($"Connection #{Id} recv data {bytesRead} bytes");
 
                 int recvBufferPos = 0;
                 int counter = 0;
@@ -327,7 +332,7 @@ namespace Warden.Networking.Tcp
                     //Infinite loop protection
                     if (counter++ > recvBuffer.Length / 2 + 100)
                     {
-                        logger.Critical($"Ininite loop in {this}");
+                        logger.Critical($"Infinite loop in {this}");
                         throw new InvalidOperationException("Infinite loop");
                     }
                 }
@@ -341,12 +346,12 @@ namespace Warden.Networking.Tcp
             catch (SocketException sex)
             {
                 if (sex.SocketErrorCode != SocketError.ConnectionReset)
-                    logger.Error($"{this} broken due to exception: {sex}");
+                    logger.Error($"Connection #{Id} broken due to exception: {sex}");
                 Close();
             }
             catch (Exception ex)
             {
-                logger.Error($"{this} broken due to exception: {ex}");
+                logger.Error($"Connection #{Id} broken due to exception: {ex}");
                 Close();
             }
         }
@@ -370,7 +375,11 @@ namespace Warden.Networking.Tcp
 
         void OnMessageReceivedInternal(TcpRawMessageHeader header, TcpRawMessage message)
         {
-            logger.Debug($"{this} recv message {message} with flags {header.Options.flags}");
+            if (header.Options.flags == MessageHeaderFlags.KeepAliveRequest ||
+                header.Options.flags == MessageHeaderFlags.KeepAliveResponse)
+                logger.Trace($"Connection #{Id} recv message {message} with options {header.Options}");
+            else
+                logger.Debug($"Connection #{Id} recv message {message} with options {header.Options}");
 
             if (header.Options.flags.HasFlag(MessageHeaderFlags.KeepAliveRequest))
             {
@@ -396,7 +405,7 @@ namespace Warden.Networking.Tcp
                 }
                 catch (Exception ex)
                 {
-                    logger.Error($"Unhandled exception in {this.GetType().Name}.OnMessageReceived: {ex}");
+                    logger.Error($"Unhandled exception in #{Id} -> {this.GetType().Name}.OnMessageReceived: {ex}");
                 }
             }, logger);
         }
@@ -425,7 +434,7 @@ namespace Warden.Networking.Tcp
 
                     if (Parent.Configuration.KeepAliveTimeout > Timeout.Infinite && timeSinceLastKeepAlive.TotalMilliseconds > Parent.Configuration.KeepAliveTimeout)
                     {
-                        logger.Debug($"{this} closing, KeepAliveTimeout exceded");
+                        logger.Debug($"Connection #{Id} closing, KeepAliveTimeout exceeded");
                         Close();
                     }
                 }
@@ -507,7 +516,12 @@ namespace Warden.Networking.Tcp
                 await sendSemaphore.WaitAsync().ConfigureAwait(false);
 
                 TcpRawMessage message = sendTuple.Message;
-                logger.Debug($"{this} sending {message} with options {sendTuple.Options}");
+                
+                if (sendTuple.Options.flags == MessageHeaderFlags.KeepAliveRequest ||
+                    sendTuple.Options.flags == MessageHeaderFlags.KeepAliveResponse)
+                    logger.Trace($"Connection #{Id} sending {message} with options {sendTuple.Options}");
+                else
+                    logger.Debug($"Connection #{Id} sending {message} with options {sendTuple.Options}");
 
                 TcpRawMessageHeader header = new TcpRawMessageHeader((int)message.BaseStream.Length, sendTuple.Options);
 
@@ -538,7 +552,7 @@ namespace Warden.Networking.Tcp
                     {
                         int sent =  await Task.Factory.FromAsync(socket.BeginSend(sendBuffer, bufferSendPosition, bufferPosition-bufferSendPosition, SocketFlags.None, null, null), socket.EndSend)
                                 .ConfigureAwait(false);
-                        logger.Trace($"{this} sent {sent} bytes");
+                        logger.Trace($"Connection #{Id} sent {sent} bytes");
                         bufferSendPosition += sent;
                         totalBytesSent += sent;
                     }
@@ -560,7 +574,7 @@ namespace Warden.Networking.Tcp
             }
             catch (Exception ex)
             {
-                logger.Error($"Exception on {sendTuple.Message} sending: {ex}");
+                logger.Error($"Exception in #{Id} on {sendTuple.Message} sending: {ex}");
                 Close();
             }
             finally

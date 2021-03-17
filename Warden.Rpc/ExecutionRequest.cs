@@ -8,14 +8,14 @@ namespace Warden.Rpc
         public object Argument { get; private set; }
         public object MethodKey { get; private set; }
 
-        internal ExecutionRequest(bool hasArgument, object argument, object methodKey)
+        public ExecutionRequest(bool hasArgument, object argument, object methodKey)
         {
             this.HasArgument = hasArgument;
             this.Argument = argument;
             this.MethodKey = methodKey;
         }
 
-        internal ExecutionRequest(RemotingRequest request) : this(request.HasArgument, request.Argument,
+        public ExecutionRequest(RemotingRequest request) : this(request.HasArgument, request.Argument,
             request.MethodKey)
         {
             

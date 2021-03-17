@@ -4,7 +4,7 @@ namespace Warden.Rpc.Events
     {
         public ExecutionRequest Request { get; private set; }
 
-        internal LocalExecutionStartingEventArgs(ExecutionRequest remotingRequest)
+        public LocalExecutionStartingEventArgs(ExecutionRequest remotingRequest)
         {
             this.Request = remotingRequest;
         }

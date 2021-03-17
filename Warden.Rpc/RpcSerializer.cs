@@ -79,7 +79,7 @@ namespace Warden.Rpc
                 {
                     if (!messageType.GetInterfaces().Contains(typeof(IMessage)))
                         continue;
-
+                    
                     MessageDescriptor descriptor = messageType.GetProperty("Descriptor",
                         BindingFlags.Public | BindingFlags.Static).GetValue(null) as MessageDescriptor;
 
@@ -159,7 +159,7 @@ namespace Warden.Rpc
                 throw new ArgumentException($"{nameof(value)} should be IMessage, ICustomMessage or primitive type, but got {value.GetType().Name}");
         }
 
-        bool IsPrimitive(Type type)
+        public static bool IsPrimitive(Type type)
         {
             if (type == typeof(byte) ||
                 type == typeof(sbyte) ||
