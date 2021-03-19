@@ -10,7 +10,7 @@ using Warden.Rpc.Net.Events;
 
 namespace Warden.Rpc.Net.Tcp
 {
-    public abstract class RpcTcpServer : IRpcPeer
+    public class RpcTcpServer : IRpcPeer
     {
         internal class InnerTcpServer : TcpServer
         {

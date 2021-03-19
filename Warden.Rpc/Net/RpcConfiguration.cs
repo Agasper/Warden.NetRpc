@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Warden.Logging;
@@ -73,6 +74,7 @@ namespace Warden.Rpc.Net
 
         public RpcConfiguration()
         {
+            serializer = new RpcSerializer(Assembly.GetEntryAssembly());
             remotingConfiguration = RemotingObjectConfiguration.Default;
             logManager = Logging.LogManager.Dummy;
             defaultExecutionTimeout = 10000;
