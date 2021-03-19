@@ -32,6 +32,12 @@ namespace Warden.Rpc.Net.Tcp
                 base.OnConnectionClosed(args);
                 args.Connection.Stash();
             }
+
+            protected override void PollEvents()
+            {
+                base.PollEvents();
+                parent.PollEvents();
+            }
         }
 
         public event DOnSessionOpened OnSessionOpenedEvent;
@@ -70,6 +76,11 @@ namespace Warden.Rpc.Net.Tcp
                         yield return session;
                 }
             }
+        }
+
+        protected virtual void PollEvents()
+        {
+            
         }
 
         public void Start()

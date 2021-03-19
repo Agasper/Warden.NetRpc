@@ -42,7 +42,7 @@ namespace Warden.Rpc.Net.Tcp
 
             protected override void PollEvents()
             {
-                parent.PollEvents();
+                parent.PollEventsInternal();
                 base.PollEvents();
             }
         }
@@ -297,7 +297,12 @@ namespace Warden.Rpc.Net.Tcp
             return true;
         }
 
-        internal void PollEvents()
+        protected virtual void PollEvents()
+        {
+            
+        }
+
+        internal void PollEventsInternal()
         {
             if (Status == RpcClientStatus.Disconnected &&
                 canReconnect &&
@@ -314,6 +319,8 @@ namespace Warden.Rpc.Net.Tcp
                     _ = StartSessionAsync(innerTcpClient.LastEndpoint);
                 }
             }
+
+            PollEvents();
         }
     }
 }
