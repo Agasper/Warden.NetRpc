@@ -39,10 +39,7 @@ namespace Warden.Rpc
         public RpcSerializer(params Assembly[] assemblies)
             : this()
         {
-            foreach (var assembly in assemblies)
-                this.assemblies.Add(assembly);
-
-            InitializeRegistry();
+            AddAssemblyTypesToRegistry(assemblies);
         }
 
         protected RpcSerializer()
@@ -53,12 +50,22 @@ namespace Warden.Rpc
 
         public void AddAssemblyTypesToRegistry(Assembly assembly)
         {
+            if (assembly == null)
+                throw new ArgumentNullException(nameof(assembly));
+            
             if (this.assemblies.Add(assembly))
                 InitializeRegistry();
         }
 
-        public void AddAssemblyTypesToRegistry(IEnumerable<Assembly> assemblies)
+        public void AddAssemblyTypesToRegistry(params Assembly[] assemblies)
         {
+            if (assemblies == null)
+                throw new ArgumentNullException(nameof(assemblies));
+            
+            foreach (var assembly in assemblies)
+                if (assembly == null)
+                    throw new ArgumentNullException(nameof(assemblies), "One of assemblies is null");
+            
             bool atLeastOneAdded = false;
             foreach (var assembly in assemblies)
                 if (this.assemblies.Add(assembly))
@@ -81,10 +88,18 @@ namespace Warden.Rpc
                         continue;
                     
                     MessageDescriptor descriptor = messageType.GetProperty("Descriptor",
-                        BindingFlags.Public | BindingFlags.Static).GetValue(null) as MessageDescriptor;
+                        BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as MessageDescriptor;
+
+                    if (descriptor == null)
+                        throw new NullReferenceException(
+                            $"{nameof(MessageDescriptor)} not found for message {messageType.FullName}");
 
                     MessageParser parser = messageType.GetProperty("Parser",
-                        BindingFlags.Public | BindingFlags.Static).GetValue(null) as MessageParser;
+                        BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as MessageParser;
+                    
+                    if (parser == null)
+                        throw new NullReferenceException(
+                            $"{nameof(MessageParser)} not found for message {messageType.FullName}");
 
                     MessageInfo wardenMessageInfo = new MessageInfo(descriptor, parser);
 
@@ -132,7 +147,7 @@ namespace Warden.Rpc
                 var type = value.GetType();
                 if (!messageMapReverse.ContainsKey(type))
                 {
-                    throw new ArgumentException($"IMessage with clr type {value.GetType().Name} not found in registry. Consider to add [ResolveMessagesFromAssembliesAttribute] to your factory");
+                    throw new ArgumentException($"IMessage with clr type {value.GetType().Name} not found in registry. Add assembly {type.Assembly.FullName} to the serializer.");
                 }
                 var messageInfo = messageMapReverse[type];
 
@@ -146,6 +161,8 @@ namespace Warden.Rpc
             else if (value is ICustomMessage customMessageValue)
             {
                 throw new NotImplementedException();
+                
+                
                 //int origPosition = (int)writer.BaseStream.Position;
 
 

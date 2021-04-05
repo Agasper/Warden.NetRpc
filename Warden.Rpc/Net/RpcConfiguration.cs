@@ -34,6 +34,8 @@ namespace Warden.Rpc.Net
 
         internal virtual void Lock()
         {
+            if (locked)
+                throw new InvalidOperationException($"{nameof(RpcConfiguration)} already locked");
             locked = true;
         }
 
@@ -74,7 +76,11 @@ namespace Warden.Rpc.Net
 
         public RpcConfiguration()
         {
-            serializer = new RpcSerializer(Assembly.GetEntryAssembly());
+            Assembly assembly = Assembly.GetEntryAssembly();
+            if (assembly != null)
+                serializer = new RpcSerializer(assembly);
+            else
+                serializer = new RpcSerializer();
             remotingConfiguration = RemotingObjectConfiguration.Default;
             logManager = Logging.LogManager.Dummy;
             defaultExecutionTimeout = 10000;

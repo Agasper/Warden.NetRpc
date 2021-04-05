@@ -51,6 +51,8 @@ namespace Warden.Networking.Udp
 
         internal void Lock()
         {
+            if (locked)
+                throw new InvalidOperationException($"{nameof(UdpConfigurationPeer)} already locked");
             locked = true;
         }
 

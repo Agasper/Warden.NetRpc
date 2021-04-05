@@ -47,6 +47,7 @@ namespace Warden.Rpc.Net.Tcp
             }
         }
 
+        public string Tag { get; set; }
         public RpcTcpConfigurationClient Configuration => configuration;
         public RpcSession Session { get; private set; }
         public TcpConnectionStatistics Statistics => innerTcpClient?.Connection?.Statistics;
@@ -75,6 +76,7 @@ namespace Warden.Rpc.Net.Tcp
             this.innerTcpClient = new InnerTcpClient(this, configuration);
             this.logger = configuration.LogManager.GetLogger(nameof(RpcTcpClient));
             this.logger.Meta["kind"] = this.GetType().Name;
+            this.logger.Meta["tag"] = new RefLogLabel<RpcTcpClient>(this, s => s.Tag);
         }
         
         public void Start()
@@ -97,6 +99,7 @@ namespace Warden.Rpc.Net.Tcp
             {
                 logger.Trace($"Connecting to {host}:{port}");
                 ChangeStatus(RpcClientStatus.Connecting);
+                canReconnect = true;
                 await innerTcpClient.ConnectAsync(host, port);
                 logger.Trace($"Waiting for session...");
                 var openedArgs = await tcsSessionOpened.Task;
@@ -104,7 +107,6 @@ namespace Warden.Rpc.Net.Tcp
                 await Authenticate(openedArgs);
                 OnSessionStarted(openedArgs);
                 ChangeStatus(RpcClientStatus.Ready);
-                canReconnect = true;
             }
             catch (Exception ex)
             {
@@ -315,7 +317,7 @@ namespace Warden.Rpc.Net.Tcp
                 }
                 else
                 {
-                    logger.Info($"Reconnecting to {innerTcpClient.LastEndpoint}...");
+                    logger.Debug($"Reconnecting to {innerTcpClient.LastEndpoint}...");
                     _ = StartSessionAsync(innerTcpClient.LastEndpoint);
                 }
             }

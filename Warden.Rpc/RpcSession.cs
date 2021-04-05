@@ -368,16 +368,6 @@ namespace Warden.Rpc
 
         }
 
-        protected virtual void OnSessionReady()
-        {
-            
-        }
-
-        internal void SetReady()
-        {
-            OnSessionReady();
-        }
-
         protected virtual async Task<ExecutionResponse> ExecuteRequestAsync(ExecutionRequest request)
         {
             if (remotingObjectScheme == null || remotingObject == null)

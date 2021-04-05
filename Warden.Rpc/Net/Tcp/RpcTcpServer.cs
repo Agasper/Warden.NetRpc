@@ -40,6 +40,7 @@ namespace Warden.Rpc.Net.Tcp
             }
         }
 
+        public string Tag { get; set; }
         public event DOnSessionOpened OnSessionOpenedEvent;
         public event DOnSessionClosed OnSessionClosedEvent;
         public RpcTcpConfigurationServer Configuration => configuration;
@@ -61,6 +62,7 @@ namespace Warden.Rpc.Net.Tcp
             this.stashedConnections = new ConcurrentStack<RpcTcpConnection>();
             this.logger = configuration.LogManager.GetLogger(nameof(RpcTcpServer));
             this.logger.Meta["kind"] = this.GetType().Name;
+            this.logger.Meta["tag"] = new RefLogLabel<RpcTcpServer>(this, s => s.Tag);
         }
 
         public int SessionsCount => innerTcpServer.Connections.Count;

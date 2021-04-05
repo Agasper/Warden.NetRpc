@@ -42,6 +42,8 @@ namespace Warden.Networking.Tcp
 
         internal void Lock()
         {
+            if (locked)
+                throw new InvalidOperationException($"{nameof(TcpConfigurationPeer)} already locked");
             locked = true;
         }
 
