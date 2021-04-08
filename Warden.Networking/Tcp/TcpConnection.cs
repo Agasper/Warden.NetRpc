@@ -98,6 +98,14 @@ namespace Warden.Networking.Tcp
             this.logger.Meta["connection_endpoint"] = new RefLogLabel<TcpConnection>(this, v => v.RemoteEndpoint);
             this.logger.Meta["connected"] = new RefLogLabel<TcpConnection>(this, s => s.Connected);
             this.logger.Meta["closed"] = new RefLogLabel<TcpConnection>(this, s => s.closed);
+            this.logger.Meta["latency"] = new RefLogLabel<TcpConnection>(this, s =>
+            {
+                var lat = s.Statistics.Latency;
+                if (lat.HasValue)
+                    return lat.Value;
+                else
+                    return "";
+            });
 
             // return $"{nameof(TcpConnection)}[id={Id}, connected={Connected}, endpoint={RemoteEndpoint}]";
         }
@@ -347,6 +355,8 @@ namespace Warden.Networking.Tcp
             {
                 if (sex.SocketErrorCode != SocketError.ConnectionReset)
                     logger.Error($"Connection #{Id} broken due to exception: {sex}");
+                else
+                    logger.Info($"Connection #{Id} reset");
                 Close();
             }
             catch (Exception ex)

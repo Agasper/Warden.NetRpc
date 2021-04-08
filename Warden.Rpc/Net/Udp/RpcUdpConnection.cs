@@ -13,6 +13,7 @@ namespace Warden.Rpc.Net.Udp
     {
         public RpcSession Session => session;
         public long Id => base.EndPoint.ConnectionKey;
+        public float? Latency => this.Statistics.Latency;
         public EndPoint RemoteEndpoint => base.EndPoint.EndPoint;
         
         RpcSession session;

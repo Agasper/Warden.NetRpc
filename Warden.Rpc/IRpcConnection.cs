@@ -6,6 +6,7 @@ namespace Warden.Rpc
     public interface IRpcConnection
     {
         long Id { get; }
+        float? Latency { get; }
         object Tag { get; }
         EndPoint RemoteEndpoint { get; }
         bool SendReliable(ICustomMessage message);

@@ -10,6 +10,7 @@ namespace Warden.Rpc.Net.Tcp
     public class RpcTcpConnection : TcpConnection, IRpcConnection
     {
         public RpcSession Session => session;
+        public float? Latency => this.Statistics.Latency;
         
         RpcSession session;
         readonly RpcConfiguration configuration;

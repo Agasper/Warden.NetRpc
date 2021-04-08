@@ -68,6 +68,14 @@ namespace Warden.Rpc
             this.logger.Meta["connection_endpoint"] = new RefLogLabel<IRpcConnection>(this.Connection, s => s.RemoteEndpoint);
             this.logger.Meta["closed"] = new RefLogLabel<RpcSession>(this, s => s.closed);
             this.logger.Meta["tag"] = new RefLogLabel<RpcSession>(this, s => s.Tag);
+            this.logger.Meta["latency"] = new RefLogLabel<RpcSession>(this, s =>
+            {
+                var lat = s.Connection.Latency;
+                if (lat.HasValue)
+                    return lat.Value;
+                else
+                    return "";
+            });
             this.logger.Debug($"{sessionContext.Connection} created {this}");
         }
 
@@ -526,7 +534,7 @@ namespace Warden.Rpc
             RemotingRequest request = GetRequest(methodIdentity, false);
             request.HasArgument = false;
             this.logger.Debug($"Sending {request}");
-            SendMessage(request, true);
+            SendMessage(request, sendingOptions.ThrowIfFailedToSend);
         }
 
         public virtual void Send<T>(int methodIdentity, T arg) => SendInternal(methodIdentity, arg, SendingOptions.Default);
@@ -541,7 +549,7 @@ namespace Warden.Rpc
             request.HasArgument = true;
             request.Argument = arg;
             this.logger.Debug($"Sending {request}");
-            SendMessage(request, true);
+            SendMessage(request, sendingOptions.ThrowIfFailedToSend);
         }
     }
 }
