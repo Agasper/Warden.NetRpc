@@ -32,12 +32,12 @@ namespace Warden.Util.Pooling
         {
         }
 
-        public GenericPool(IEnumerable<T> initialValues)
+        private GenericPool(IEnumerable<T> initialValues)
         {
             stack = new ConcurrentStack<T>(initialValues);
         }
 
-        public GenericPool()
+        private GenericPool()
         {
             stack = new ConcurrentStack<T>();
         }
