@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO.Compression;
 using Warden.Networking.IO;
 using Warden.Networking.Tcp;
 using Warden.Networking.Tcp.Events;
@@ -87,9 +88,22 @@ namespace Warden.Rpc.Net.Tcp
             {
                 using (args.Message)
                 {
-                    using (WardenStreamReader sr = new WardenStreamReader(args.Message.BaseStream, true))
+                    if (args.Message.Compressed)
                     {
-                        session.OnMessage(sr);
+                        using (var uncompressedMessage = args.Message.Decompress())
+                        {
+                            using (WardenStreamReader sr = new WardenStreamReader(uncompressedMessage.BaseStream, true))
+                            {
+                                session.OnMessage(sr);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        using (WardenStreamReader sr = new WardenStreamReader(args.Message.BaseStream, true))
+                        {
+                            session.OnMessage(sr);
+                        }
                     }
                 }
             }
@@ -104,14 +118,24 @@ namespace Warden.Rpc.Net.Tcp
         {
             if (!this.Connected)
                 return false;
-            
+
             TcpRawMessage rawMessage = Parent.CreateMessage();
             using (WardenStreamWriter sw = new WardenStreamWriter(rawMessage.BaseStream, true))
             {
                 message.WriteTo(new WriteFormatterInfo(sw, configuration.Serializer));
             }
-            
-            SendRawMessage(rawMessage);
+
+            if (rawMessage.Length >= configuration.CompressionThreshold)
+            {
+                using (rawMessage)
+                {
+                    var compressedMessage = rawMessage.Compress(CompressionLevel.Optimal);
+                    SendRawMessage(compressedMessage);
+                }
+            }
+            else
+                SendRawMessage(rawMessage);
+
             return true;
         }
 

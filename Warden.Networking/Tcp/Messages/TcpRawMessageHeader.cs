@@ -7,6 +7,8 @@ namespace Warden.Networking.Tcp.Messages
         None = 0,
         KeepAliveRequest = 1,
         KeepAliveResponse = 2,
+        Compressed = 4,
+            //8
             //16
             //32
     }
@@ -63,7 +65,7 @@ namespace Warden.Networking.Tcp.Messages
         {
             if (!flagsRead)
             {
-                options.flags = (MessageHeaderFlags)value;
+                options.Flags = (MessageHeaderFlags)value;
                 flagsRead = true;
                 return false;
             }
@@ -112,7 +114,7 @@ namespace Warden.Networking.Tcp.Messages
 
             } while (value != 0);
 
-            header[0] = (byte)options.flags;
+            header[0] = (byte) options.Flags;
 
             return new ArraySegment<byte>(header, 0, headerPos);
         }

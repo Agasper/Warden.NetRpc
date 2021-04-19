@@ -2,19 +2,23 @@
 {
     struct TcpRawMessageOptions
     {
-        public MessageHeaderFlags flags;
+        public MessageHeaderFlags Flags { get; set; }
+        
+        public bool HasFlag(MessageHeaderFlags flag)
+        {
+            return Flags.HasFlag(flag);
+        }
 
         public override string ToString()
         {
-            return $"RawMessageOptions[F={flags}]";
+            return $"RawMessageOptions[F={Flags}]";
         }
 
-        public static TcpRawMessageOptions None
+        public TcpRawMessageOptions(MessageHeaderFlags flags)
         {
-            get
-            {
-                return new TcpRawMessageOptions() { flags = MessageHeaderFlags.None };
-            }
+            this.Flags = flags;
         }
+
+        public static TcpRawMessageOptions None => new TcpRawMessageOptions(MessageHeaderFlags.None);
     }
 }

@@ -19,6 +19,7 @@ namespace Warden.Rpc.Net
         public ILogManager LogManager { get => logManager; set { CheckLocked(); CheckNull(value); logManager = value; } }
         public ISessionFactory SessionFactory { get => sessionFactory; set { CheckLocked(); CheckNull(value); sessionFactory = value; } }
         public RemotingObjectConfiguration RemotingConfiguration { get => remotingConfiguration; set { CheckLocked(); CheckNull(value); remotingConfiguration = value; } }
+        public int CompressionThreshold { get => compressionThreshold; set { CheckLocked(); compressionThreshold = value; } }
 
         ICipherFactory cipherFactory;
         ISessionFactory sessionFactory;
@@ -26,6 +27,7 @@ namespace Warden.Rpc.Net
         int defaultExecutionTimeout;
         bool orderedExecution;
         int orderedExecutionMaxQueue;
+        int compressionThreshold;
         RpcSerializer serializer;
         TaskScheduler taskScheduler;
         RemotingObjectConfiguration remotingConfiguration;
@@ -86,6 +88,7 @@ namespace Warden.Rpc.Net
             defaultExecutionTimeout = 10000;
             orderedExecution = false;
             orderedExecutionMaxQueue = 32;
+            compressionThreshold = 1024;
             taskScheduler = TaskScheduler.Default;
         }
     }

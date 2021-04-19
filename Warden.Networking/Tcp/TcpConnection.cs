@@ -385,21 +385,24 @@ namespace Warden.Networking.Tcp
 
         void OnMessageReceivedInternal(TcpRawMessageHeader header, TcpRawMessage message)
         {
-            if (header.Options.flags == MessageHeaderFlags.KeepAliveRequest ||
-                header.Options.flags == MessageHeaderFlags.KeepAliveResponse)
+            if (header.Options.HasFlag(MessageHeaderFlags.Compressed))
+                message.Compressed = true;
+
+            if (header.Options.HasFlag(MessageHeaderFlags.KeepAliveRequest |
+                                           MessageHeaderFlags.KeepAliveResponse))
                 logger.Trace($"Connection #{Id} recv message {message} with options {header.Options}");
             else
                 logger.Debug($"Connection #{Id} recv message {message} with options {header.Options}");
 
-            if (header.Options.flags.HasFlag(MessageHeaderFlags.KeepAliveRequest))
+            if (header.Options.HasFlag(MessageHeaderFlags.KeepAliveRequest))
             {
                 LastKeepAliveRequestReceived = DateTime.UtcNow;
-                _ = SendMessageAsync(TcpRawMessage.GetEmpty(Parent.Configuration.MemoryStreamPool), new TcpRawMessageOptions() { flags = MessageHeaderFlags.KeepAliveResponse });
+                _ = SendMessageAsync(TcpRawMessage.GetEmpty(Parent.Configuration.MemoryStreamPool), new TcpRawMessageOptions(MessageHeaderFlags.KeepAliveResponse));
                 message.Dispose();
                 return;
             }
 
-            if (header.Options.flags.HasFlag(MessageHeaderFlags.KeepAliveResponse))
+            if (header.Options.HasFlag(MessageHeaderFlags.KeepAliveResponse))
             {
                 Statistics.UpdateLatency((float)(DateTime.UtcNow - this.lastKeepAliveSent).TotalMilliseconds);
                 keepAliveResponseGot = true;
@@ -432,7 +435,7 @@ namespace Warden.Networking.Tcp
                     {
                         keepAliveResponseGot = false;
                         this.lastKeepAliveSent = DateTime.UtcNow;
-                        _ = SendMessageAsync(TcpRawMessage.GetEmpty(Parent.Configuration.MemoryStreamPool), new TcpRawMessageOptions() { flags = MessageHeaderFlags.KeepAliveRequest });
+                        _ = SendMessageAsync(TcpRawMessage.GetEmpty(Parent.Configuration.MemoryStreamPool), new TcpRawMessageOptions(MessageHeaderFlags.KeepAliveRequest ));
                     }
                 }
                 else
@@ -481,7 +484,10 @@ namespace Warden.Networking.Tcp
 
         public virtual Task SendMessageAsync(TcpRawMessage message)
         {
-            return SendMessageAsync(message, TcpRawMessageOptions.None);
+            TcpRawMessageOptions options = TcpRawMessageOptions.None;
+            if (message.Compressed)
+                options.Flags |= MessageHeaderFlags.Compressed;
+            return SendMessageAsync(message, options);
         }
 
         async Task SendMessageAsync(TcpRawMessage message, TcpRawMessageOptions options)
@@ -527,8 +533,7 @@ namespace Warden.Networking.Tcp
 
                 TcpRawMessage message = sendTuple.Message;
                 
-                if (sendTuple.Options.flags == MessageHeaderFlags.KeepAliveRequest ||
-                    sendTuple.Options.flags == MessageHeaderFlags.KeepAliveResponse)
+                if (sendTuple.Options.HasFlag(MessageHeaderFlags.KeepAliveRequest | MessageHeaderFlags.KeepAliveResponse))
                     logger.Trace($"Connection #{Id} sending {message} with options {sendTuple.Options}");
                 else
                     logger.Debug($"Connection #{Id} sending {message} with options {sendTuple.Options}");

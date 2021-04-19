@@ -22,7 +22,7 @@ namespace Warden.Networking.Messages
         private protected MemoryStream stream;
         private protected MemoryStreamPool memoryStreamPool;
 
-        bool disposed;
+        private protected bool disposed;
 
         private protected RawMessage(MemoryStreamPool memoryStreamPool)
         {
