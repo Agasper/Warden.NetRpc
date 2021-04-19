@@ -142,7 +142,7 @@ namespace Warden.Rpc
 
         internal virtual void OnExtraMessage(MessageType messageType, ReadFormatterInfo readFormatterInfo)
         {
-            throw new ArgumentException($"Wrong message type: {messageType}");
+            throw new ArgumentException($"Wrong message type: {messageType}, perhaps encryption or compression mismatch");
         }
 
         public void OnMessage(IReader reader)

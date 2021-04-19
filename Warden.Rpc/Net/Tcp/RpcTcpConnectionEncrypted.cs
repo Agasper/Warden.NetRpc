@@ -101,6 +101,7 @@ namespace Warden.Rpc.Net.Tcp
         {
             using (message)
             {
+                message.Position = 0;
                 TcpRawMessage encryptedMessage = message.Encrypt(cipher);
                 base.SendRawMessage(encryptedMessage);
             }

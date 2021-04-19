@@ -77,7 +77,6 @@ namespace Warden.Networking.Tcp
         struct DelayedMessage //for latency simulation
         {
             public TcpRawMessage message;
-            public TcpRawMessageHeader header;
             public DateTime releaseTimestamp;
         }
 
@@ -328,7 +327,8 @@ namespace Warden.Networking.Tcp
                             awaitingNextMessage.BaseStream.Position = 0;
                             var message = awaitingNextMessage;
                             awaitingNextMessage = null;
-                            OnMessageReceivedInternalWithSimulation(awaitingMessageHeader, message);
+                            message.Flags = awaitingMessageHeader.Options.Flags;
+                            OnMessageReceivedInternalWithSimulation(message);
                             awaitingNextMessageWrote = 0;
                             awaitingMessageHeader = new TcpRawMessageHeader();
                             awaitingNextMessageHeaderValid = false;
@@ -366,43 +366,40 @@ namespace Warden.Networking.Tcp
             }
         }
 
-        void OnMessageReceivedInternalWithSimulation(TcpRawMessageHeader header, TcpRawMessage message)
+        void OnMessageReceivedInternalWithSimulation(TcpRawMessage message)
         {
             if (Parent.Configuration.ConnectionSimulation != null)
             {
                 int delay = Parent.Configuration.ConnectionSimulation.GetHalfDelay();
                 latencySimulationRecvQueue.Enqueue(new DelayedMessage()
                 {
-                    header = header,
                     message = message,
                     releaseTimestamp = DateTime.UtcNow.AddMilliseconds(delay)
                 });
                 return;
             }
 
-            OnMessageReceivedInternal(header, message);
+            OnMessageReceivedInternal(message);
         }
 
-        void OnMessageReceivedInternal(TcpRawMessageHeader header, TcpRawMessage message)
+        void OnMessageReceivedInternal(TcpRawMessage message)
         {
-            if (header.Options.HasFlag(MessageHeaderFlags.Compressed))
-                message.Compressed = true;
-
-            if (header.Options.HasFlag(MessageHeaderFlags.KeepAliveRequest |
-                                           MessageHeaderFlags.KeepAliveResponse))
-                logger.Trace($"Connection #{Id} recv message {message} with options {header.Options}");
+            
+            if (message.Flags.HasFlag(MessageHeaderFlags.KeepAliveRequest) ||
+                    message.Flags.HasFlag(MessageHeaderFlags.KeepAliveResponse))
+                logger.Trace($"Connection #{Id} recv message {message}");
             else
-                logger.Debug($"Connection #{Id} recv message {message} with options {header.Options}");
+                logger.Debug($"Connection #{Id} recv message {message}");
 
-            if (header.Options.HasFlag(MessageHeaderFlags.KeepAliveRequest))
+            if (message.Flags.HasFlag(MessageHeaderFlags.KeepAliveRequest))
             {
                 LastKeepAliveRequestReceived = DateTime.UtcNow;
-                _ = SendMessageAsync(TcpRawMessage.GetEmpty(Parent.Configuration.MemoryStreamPool), new TcpRawMessageOptions(MessageHeaderFlags.KeepAliveResponse));
+                _ = SendMessageAsync(TcpRawMessage.GetEmpty(Parent.Configuration.MemoryStreamPool, MessageHeaderFlags.KeepAliveResponse));
                 message.Dispose();
                 return;
             }
 
-            if (header.Options.HasFlag(MessageHeaderFlags.KeepAliveResponse))
+            if (message.Flags.HasFlag(MessageHeaderFlags.KeepAliveResponse))
             {
                 Statistics.UpdateLatency((float)(DateTime.UtcNow - this.lastKeepAliveSent).TotalMilliseconds);
                 keepAliveResponseGot = true;
@@ -435,7 +432,7 @@ namespace Warden.Networking.Tcp
                     {
                         keepAliveResponseGot = false;
                         this.lastKeepAliveSent = DateTime.UtcNow;
-                        _ = SendMessageAsync(TcpRawMessage.GetEmpty(Parent.Configuration.MemoryStreamPool), new TcpRawMessageOptions(MessageHeaderFlags.KeepAliveRequest ));
+                        _ = SendMessageAsync(TcpRawMessage.GetEmpty(Parent.Configuration.MemoryStreamPool, MessageHeaderFlags.KeepAliveRequest ));
                     }
                 }
                 else
@@ -462,7 +459,7 @@ namespace Warden.Networking.Tcp
                     if (DateTime.UtcNow > msg.releaseTimestamp)
                     {
                         latencySimulationRecvQueue.TryDequeue(out DelayedMessage _msg);
-                        OnMessageReceivedInternal(msg.header, msg.message);
+                        OnMessageReceivedInternal(msg.message);
                     }
                     else
                         break;
@@ -482,15 +479,7 @@ namespace Warden.Networking.Tcp
         //    SendMessageAsync(message);
         //}
 
-        public virtual Task SendMessageAsync(TcpRawMessage message)
-        {
-            TcpRawMessageOptions options = TcpRawMessageOptions.None;
-            if (message.Compressed)
-                options.Flags |= MessageHeaderFlags.Compressed;
-            return SendMessageAsync(message, options);
-        }
-
-        async Task SendMessageAsync(TcpRawMessage message, TcpRawMessageOptions options)
+        public virtual async Task SendMessageAsync(TcpRawMessage message)
         {
             if (!Connected)
             {
@@ -509,11 +498,11 @@ namespace Warden.Networking.Tcp
             lock (sendMutex)
             {
                 sendTask = sendTask.ContinueWith(
-                    (task, tuple) =>
+                    (task, msg) =>
                 {
-                    return SendMessageInternalAsync((SendTuple)tuple);
-                }, new SendTuple(message, options))
-                        .Unwrap();
+                    return SendMessageInternalAsync(msg as TcpRawMessage);
+                }, message)
+                    .Unwrap();
 
                 newSendTask = sendTask;
             }
@@ -521,7 +510,7 @@ namespace Warden.Networking.Tcp
             await newSendTask.ConfigureAwait(false);
         }
 
-        async Task SendMessageInternalAsync(SendTuple sendTuple)
+        async Task SendMessageInternalAsync(TcpRawMessage message)
         {
             try
             {
@@ -531,14 +520,13 @@ namespace Warden.Networking.Tcp
 
                 await sendSemaphore.WaitAsync().ConfigureAwait(false);
 
-                TcpRawMessage message = sendTuple.Message;
-                
-                if (sendTuple.Options.HasFlag(MessageHeaderFlags.KeepAliveRequest | MessageHeaderFlags.KeepAliveResponse))
-                    logger.Trace($"Connection #{Id} sending {message} with options {sendTuple.Options}");
+                if (message.Flags.HasFlag(MessageHeaderFlags.KeepAliveRequest) || 
+                        message.Flags.HasFlag(MessageHeaderFlags.KeepAliveResponse))
+                    logger.Trace($"Connection #{Id} sending {message}");
                 else
-                    logger.Debug($"Connection #{Id} sending {message} with options {sendTuple.Options}");
+                    logger.Debug($"Connection #{Id} sending {message}");
 
-                TcpRawMessageHeader header = new TcpRawMessageHeader((int)message.BaseStream.Length, sendTuple.Options);
+                TcpRawMessageHeader header = new TcpRawMessageHeader(message);
 
                 var headerBytes = header.Build();
                 Buffer.BlockCopy(headerBytes.Array, headerBytes.Offset, sendBuffer, 0, headerBytes.Count);
@@ -589,13 +577,13 @@ namespace Warden.Networking.Tcp
             }
             catch (Exception ex)
             {
-                logger.Error($"Exception in #{Id} on {sendTuple.Message} sending: {ex}");
+                logger.Error($"Exception in #{Id} on {message} sending: {ex}");
                 Close();
             }
             finally
             {
                 sendSemaphore.Release();
-                sendTuple.Message.Dispose();
+                message.Dispose();
             }
         }
 

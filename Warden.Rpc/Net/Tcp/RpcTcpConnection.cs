@@ -88,7 +88,7 @@ namespace Warden.Rpc.Net.Tcp
             {
                 using (args.Message)
                 {
-                    if (args.Message.Compressed)
+                    if (args.Message.HasCompressionMark())
                     {
                         using (var uncompressedMessage = args.Message.Decompress())
                         {
@@ -130,6 +130,7 @@ namespace Warden.Rpc.Net.Tcp
                 using (rawMessage)
                 {
                     var compressedMessage = rawMessage.Compress(CompressionLevel.Optimal);
+                    compressedMessage.Position = 0;
                     SendRawMessage(compressedMessage);
                 }
             }

@@ -7,10 +7,10 @@ namespace Warden.Networking.Tcp.Messages
         None = 0,
         KeepAliveRequest = 1,
         KeepAliveResponse = 2,
-        Compressed = 4,
-            //8
-            //16
-            //32
+        //4
+        //8
+        //16
+        //32
     }
 
     class TcpRawMessageHeader
@@ -27,10 +27,10 @@ namespace Warden.Networking.Tcp.Messages
             options = TcpRawMessageOptions.None;
         }
 
-        public TcpRawMessageHeader(int size, TcpRawMessageOptions options) : this()
+        public TcpRawMessageHeader(TcpRawMessage message) : this()
         {
-            this.MessageSize = size;
-            this.options = options;
+            this.MessageSize = message.Length;
+            this.options = new TcpRawMessageOptions(message.Flags);
         }
 
         public override string ToString()
