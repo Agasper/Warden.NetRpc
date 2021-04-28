@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
+using ICSharpCode.SharpZipLib.GZip;
 using Warden.Networking.Cryptography;
 using Warden.Networking.IO;
 using Warden.Networking.Messages;
@@ -77,11 +78,7 @@ namespace Warden.Networking.Tcp.Messages
             TcpRawMessage compressedMessage = new TcpRawMessage(this.memoryStreamPool, (int)this.stream.Length);
             compressedMessage.Flags = this.Flags;
             this.stream.Position = 0;
-            using (GZipStream gzipStream = new GZipStream(compressedMessage.BaseStream, compressionLevel, true))
-            {
-                this.stream.CopyTo(gzipStream);
-            }
-            
+            GZip.Compress(this.stream, compressedMessage.stream, false);
             compressedMessage.Position = 0;
             return compressedMessage;
         }
@@ -94,11 +91,7 @@ namespace Warden.Networking.Tcp.Messages
             TcpRawMessage decompressedMessage = new TcpRawMessage(this.memoryStreamPool, (int)this.stream.Length);
             decompressedMessage.Flags = this.Flags;
             this.stream.Position = 0;
-            using (GZipStream gzipStream = new GZipStream(this.stream, CompressionMode.Decompress, true))
-            {
-                gzipStream.CopyTo(decompressedMessage.BaseStream);
-            }
-
+            GZip.Decompress(this.stream, decompressedMessage.stream, false);
             decompressedMessage.Position = 0;
             return decompressedMessage;
         }
