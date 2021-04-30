@@ -83,6 +83,7 @@ namespace Warden.Rpc.Net.Tcp
                 {
                     using (var decryptedMessage = args.Message.Decrypt(cipher))
                     {
+                        logger.Trace($"Decrypting {args.Message} to {decryptedMessage}");
                         base.OnMessageReceived(new MessageEventArgs(this, decryptedMessage));
                     }
 
@@ -103,6 +104,7 @@ namespace Warden.Rpc.Net.Tcp
             {
                 message.Position = 0;
                 TcpRawMessage encryptedMessage = message.Encrypt(cipher);
+                logger.Trace($"Encrypting {message} to {encryptedMessage}");
                 base.SendRawMessage(encryptedMessage);
             }
         }

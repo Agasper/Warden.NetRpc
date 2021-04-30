@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Buffers;
 using System.IO;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using ICSharpCode.SharpZipLib.GZip;
+using ICSharpCode.SharpZipLib.Zip;
 using Warden.Networking.Cryptography;
 using Warden.Networking.IO;
 using Warden.Networking.Messages;
@@ -13,14 +15,16 @@ namespace Warden.Networking.Tcp.Messages
 {
     public class TcpRawMessage : RawMessage
     {
+        const int BUFFER_SIZE = 512;
+        
         internal MessageHeaderFlags Flags { get; set; }
 
         public override string ToString()
         {
             if (stream == null || disposed)
-                return $"{this.GetType().Name}[size=0,flags={Flags}]";
+                return $"{this.GetType().Name}[size=0,flags={Flags},hc={this.GetHashCode()}]";
             else
-                return $"{this.GetType().Name}[size={stream.Length},flags={Flags}]";
+                return $"{this.GetType().Name}[size={stream.Length},flags={Flags},hc={this.GetHashCode()}]";
         }
         
         internal static TcpRawMessage GetEmpty(MemoryStreamPool memoryStreamPool, MessageHeaderFlags flags)
@@ -78,7 +82,28 @@ namespace Warden.Networking.Tcp.Messages
             TcpRawMessage compressedMessage = new TcpRawMessage(this.memoryStreamPool, (int)this.stream.Length);
             compressedMessage.Flags = this.Flags;
             this.stream.Position = 0;
-            GZip.Compress(this.stream, compressedMessage.stream, false);
+            
+            byte[] buffer = null;
+            try
+            {
+                buffer = ArrayPool<byte>.Shared.Rent(BUFFER_SIZE);
+                using (GZipOutputStream gzip = new GZipOutputStream(compressedMessage.stream, BUFFER_SIZE))
+                {
+                    gzip.SetLevel(6);
+                    gzip.IsStreamOwner = false;
+                    int readBytes;
+                    while ((readBytes = this.stream.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        gzip.Write(buffer, 0, readBytes);
+                    }
+                }
+            }
+            finally
+            {
+                if (buffer != null)
+                    ArrayPool<byte>.Shared.Return(buffer);
+            }
+            
             compressedMessage.Position = 0;
             return compressedMessage;
         }
@@ -91,7 +116,27 @@ namespace Warden.Networking.Tcp.Messages
             TcpRawMessage decompressedMessage = new TcpRawMessage(this.memoryStreamPool, (int)this.stream.Length);
             decompressedMessage.Flags = this.Flags;
             this.stream.Position = 0;
-            GZip.Decompress(this.stream, decompressedMessage.stream, false);
+
+            byte[] buffer = null;
+            try
+            {
+                buffer = ArrayPool<byte>.Shared.Rent(BUFFER_SIZE);
+                using (GZipInputStream gzip = new GZipInputStream(this.stream))
+                {
+                    gzip.IsStreamOwner = false;
+                    int readBytes;
+                    while ((readBytes = gzip.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        decompressedMessage.stream.Write(buffer, 0, readBytes);
+                    }
+                }
+            }
+            finally
+            {
+                if (buffer != null)
+                    ArrayPool<byte>.Shared.Return(buffer);
+            }
+
             decompressedMessage.Position = 0;
             return decompressedMessage;
         }

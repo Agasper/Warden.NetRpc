@@ -90,8 +90,10 @@ namespace Warden.Rpc.Net.Tcp
                 {
                     if (args.Message.HasCompressionMark())
                     {
+                        logger.Trace($"Message {args.Message} has compression mark, decompressing it");
                         using (var uncompressedMessage = args.Message.Decompress())
                         {
+                            logger.Trace($"Decompressing {args.Message} to {uncompressedMessage}");
                             using (WardenStreamReader sr = new WardenStreamReader(uncompressedMessage.BaseStream, true))
                             {
                                 session.OnMessage(sr);
@@ -127,9 +129,11 @@ namespace Warden.Rpc.Net.Tcp
 
             if (rawMessage.Length >= configuration.CompressionThreshold)
             {
+                logger.Trace($"Message {message} size exceeds compression threshold {configuration.CompressionThreshold}, compressing it");
                 using (rawMessage)
                 {
                     var compressedMessage = rawMessage.Compress(CompressionLevel.Optimal);
+                    logger.Trace($"Compressing {rawMessage} to {compressedMessage}");
                     compressedMessage.Position = 0;
                     SendRawMessage(compressedMessage);
                 }

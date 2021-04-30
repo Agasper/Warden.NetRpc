@@ -429,7 +429,7 @@ namespace Warden.Rpc
 
         protected internal void SendMessage(ICustomMessage message, bool throwIfFailed)
         {
-            this.logger.Trace($"Sending {message}");
+            this.logger.Debug($"Sending {message}");
             if (!this.Connection.SendReliable(message))
             {
                 if (throwIfFailed)
@@ -437,6 +437,7 @@ namespace Warden.Rpc
                 else
                     logger.Debug($"Couldn't send {message}, transport connection is closed");
             }
+            this.logger.Trace($"Sent {message}");
         }
 
         async Task SendAndWait(RemotingRequest request, ExecutionOptions options)
@@ -533,7 +534,6 @@ namespace Warden.Rpc
             CheckClosed();
             RemotingRequest request = GetRequest(methodIdentity, false);
             request.HasArgument = false;
-            this.logger.Debug($"Sending {request}");
             SendMessage(request, sendingOptions.ThrowIfFailedToSend);
         }
 
@@ -548,7 +548,6 @@ namespace Warden.Rpc
             RemotingRequest request = GetRequest(methodIdentity, false);
             request.HasArgument = true;
             request.Argument = arg;
-            this.logger.Debug($"Sending {request}");
             SendMessage(request, sendingOptions.ThrowIfFailedToSend);
         }
     }
