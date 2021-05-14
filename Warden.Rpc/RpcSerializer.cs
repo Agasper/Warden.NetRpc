@@ -46,6 +46,8 @@ namespace Warden.Rpc
         {
             this.Encoding = new UTF8Encoding(false);
             this.assemblies = new HashSet<Assembly>();
+            this.messageMap = new Dictionary<string, MessageInfo>();
+            this.messageMapReverse = new Dictionary<Type, MessageInfo>();
         }
 
         public void AddAssemblyTypesToRegistry(Assembly assembly)
