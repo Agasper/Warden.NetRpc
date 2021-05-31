@@ -23,8 +23,8 @@
     <PackageReference Include="System.Memory" Version="4.5.4" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Google.Protobuf, Version=3.13.0.0, Culture=neutral, PublicKeyToken=a7d26565bac4d604">
-      <HintPath>..\Libs\Protobuf3.13.0\netstandard2.0\Google.Protobuf.dll</HintPath>
+    <Reference Include="Google.Protobuf, Version=3.17.2.0, Culture=neutral, PublicKeyToken=a7d26565bac4d604">
+      <HintPath>..\..\Google.Protobuf\csharp\src\Google.Protobuf\bin\Release\netstandard2.0\Google.Protobuf.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

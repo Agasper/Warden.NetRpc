@@ -7,6 +7,7 @@ namespace Warden.Rpc.Payload
     public class RemotingRequest : RemotingPayload
     {
         public bool ExpectResponse { get; set; }
+        public bool ExpectAck { get; set; }
         public object MethodKey { get; set; }
         public uint RequestId { get; set; }
         public DateTime Created { get; private set; }
@@ -47,6 +48,7 @@ namespace Warden.Rpc.Payload
             this.RequestId = readFormatterInfo.Reader.ReadVarUInt32();
             bool keyIsInt = (serviceByte & (1 << 1)) == (1 << 1);
             ExpectResponse = (serviceByte & (1 << 2)) == (1 << 2);
+            ExpectAck = (serviceByte & (1 << 3)) == (1 << 3);
             if (keyIsInt)
                 this.MethodKey = readFormatterInfo.Reader.ReadVarInt32();
             else
@@ -60,6 +62,8 @@ namespace Warden.Rpc.Payload
                 serviceByte |= 1 << 1;
             if (ExpectResponse)
                 serviceByte |= 1 << 2;
+            if (ExpectAck)
+                serviceByte |= 1 << 3;
             base.WriteTo(writeFormatterInfo);
             writeFormatterInfo.Writer.WriteVarInt(RequestId);
             if (MethodKey is int)

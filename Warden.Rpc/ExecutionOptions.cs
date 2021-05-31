@@ -1,13 +1,14 @@
 ﻿namespace Warden.Rpc
 {
-    public class ExecutionOptions
+    public struct ExecutionOptions
     {
         public int Timeout { get; set; }
         public object State { get; set; }
 
-        public ExecutionOptions()
+        public ExecutionOptions(int timeout, object state)
         {
-            Timeout = System.Threading.Timeout.Infinite;
+            this.Timeout = timeout;
+            this.State = state;
         }
 
         public ExecutionOptions WithTimeout(int timeout)
@@ -21,6 +22,6 @@
             return $"{nameof(ExecutionOptions)}[timeout={Timeout}]";
         }
 
-        public static ExecutionOptions Default => new ExecutionOptions();
+        public static ExecutionOptions Default => new ExecutionOptions(System.Threading.Timeout.Infinite, null);
     }
 }

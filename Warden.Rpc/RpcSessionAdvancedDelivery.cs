@@ -42,7 +42,7 @@ namespace Warden.Rpc
 
         void Send_(object methodIdentity, DeliveryType deliveryType, int channel, SendingOptions sendingOptions)
         {
-            RemotingRequest request = GetRequest(methodIdentity, false);
+            RemotingRequest request = GetRequest(methodIdentity, false, !sendingOptions.NoAck);
             request.HasArgument = false;
             this.logger.Debug($"Sending {request}");
             SendMessageCustom(request, deliveryType, channel);
@@ -69,7 +69,7 @@ namespace Warden.Rpc
         void Send_<T>(object methodIdentity, T arg, DeliveryType deliveryType, int channel,
             SendingOptions sendingOptions)
         {
-            RemotingRequest request = GetRequest(methodIdentity, false);
+            RemotingRequest request = GetRequest(methodIdentity, false, !sendingOptions.NoAck);
             request.HasArgument = true;
             request.Argument = arg;
             this.logger.Debug($"Sending {request}");

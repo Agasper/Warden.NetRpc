@@ -281,21 +281,24 @@ namespace Warden.Rpc
                 float ms = timeSpanTicks / (float) TimeSpan.TicksPerMillisecond;
                 logger.Debug($"Executed {request} locally in {ms.ToString("0.00")}ms");
 
-                RemotingResponse response = new RemotingResponse();
-                response.RequestId = request.RequestId;
-                response.ExecutionTime = timeSpanTicks;
-                response.HasArgument = false;
-                if (request.ExpectResponse)
-                {
-                    response.HasArgument = executionResponse.HasResult;
-                    response.Argument = executionResponse.Result;
-                }
-                
                 LocalExecutionCompletedEventArgs eventArgsCompleted =
                     new LocalExecutionCompletedEventArgs(executionRequest, executionResponse, ms);
                 OnLocalExecutionCompleted(eventArgsCompleted);
-                
-                SendMessage(response, false);
+
+                if (request.ExpectAck)
+                {
+                    RemotingResponse response = new RemotingResponse();
+                    response.RequestId = request.RequestId;
+                    response.ExecutionTime = timeSpanTicks;
+                    response.HasArgument = false;
+                    if (request.ExpectResponse)
+                    {
+                        response.HasArgument = executionResponse.HasResult;
+                        response.Argument = executionResponse.Result;
+                    }
+                    
+                    SendMessage(response, false);
+                }
             }
             catch (Exception ex)
             {
@@ -394,10 +397,12 @@ namespace Warden.Rpc
             return executionResponse;
         }
 
-        protected internal RemotingRequest GetRequest(object methodIdentity, bool expectResponse)
+        protected internal RemotingRequest GetRequest(object methodIdentity, bool expectResponse, bool expectAck)
         {
             if (!(methodIdentity is int || methodIdentity is string))
                 throw new ArgumentException($"{nameof(methodIdentity)} should be int or string");
+            if (!expectAck && expectResponse)
+                throw new ArgumentException("You can't reset expectAck and set expectResponse", nameof(expectAck));
 
             lock (requestsMutex)
             {
@@ -407,11 +412,12 @@ namespace Warden.Rpc
                 request.HasArgument = false;
                 request.Argument = null;
                 request.ExpectResponse = expectResponse;
+                request.ExpectAck = expectAck;
                 
                 lock (lastRequestIdMutex)
                     request.RequestId = lastRequestId++;
 
-                if (!requests.TryAdd(request.RequestId, request))
+                if (expectAck && !requests.TryAdd(request.RequestId, request))
                     throw new InvalidOperationException("Could not create a new request");
                 
                 if (expectResponse)
@@ -476,7 +482,7 @@ namespace Warden.Rpc
         Task ExecuteAsyncInternal(object methodIdentity, ExecutionOptions options)
         {
             CheckClosed();
-            RemotingRequest request = GetRequest(methodIdentity, true);
+            RemotingRequest request = GetRequest(methodIdentity, true, true);
             request.HasArgument = false;
             return SendAndWait(request, options);
         }
@@ -489,7 +495,7 @@ namespace Warden.Rpc
         Task ExecuteAsyncInternal<A>(object methodIdentity, A arg, ExecutionOptions options)
         {
             CheckClosed();
-            RemotingRequest request = GetRequest(methodIdentity, true);
+            RemotingRequest request = GetRequest(methodIdentity, true, true);
             request.HasArgument = true;
             request.Argument = arg;
             return SendAndWait(request, options);
@@ -503,7 +509,7 @@ namespace Warden.Rpc
         async Task<R> ExecuteAsyncInternal<R>(object methodIdentity, ExecutionOptions options)
         {
             CheckClosed();
-            RemotingRequest request = GetRequest(methodIdentity, true);
+            RemotingRequest request = GetRequest(methodIdentity, true, true);
             request.HasArgument = false;
             await SendAndWait(request, options).ConfigureAwait(false);
             return (R)request.Result;
@@ -517,7 +523,7 @@ namespace Warden.Rpc
         async Task<R> ExecuteAsyncInternal<R, A>(object methodIdentity, A arg, ExecutionOptions options)
         {
             CheckClosed();
-            RemotingRequest request = GetRequest(methodIdentity, true);
+            RemotingRequest request = GetRequest(methodIdentity, true, true);
             request.HasArgument = true;
             request.Argument = arg;
             await SendAndWait(request, options).ConfigureAwait(false);
@@ -531,8 +537,11 @@ namespace Warden.Rpc
 
         void SendInternal(object methodIdentity, SendingOptions sendingOptions)
         {
-            CheckClosed();
-            RemotingRequest request = GetRequest(methodIdentity, false);
+            if (sendingOptions.ThrowIfFailedToSend)
+                CheckClosed();
+            else if (closed)
+                return;
+            RemotingRequest request = GetRequest(methodIdentity, false, !sendingOptions.NoAck);
             request.HasArgument = false;
             SendMessage(request, sendingOptions.ThrowIfFailedToSend);
         }
@@ -544,8 +553,11 @@ namespace Warden.Rpc
 
         void SendInternal<T>(object methodIdentity, T arg, SendingOptions sendingOptions)
         {
-            CheckClosed();
-            RemotingRequest request = GetRequest(methodIdentity, false);
+            if (sendingOptions.ThrowIfFailedToSend)
+                CheckClosed();
+            else if (closed)
+                return;
+            RemotingRequest request = GetRequest(methodIdentity, false, !sendingOptions.NoAck);
             request.HasArgument = true;
             request.Argument = arg;
             SendMessage(request, sendingOptions.ThrowIfFailedToSend);
