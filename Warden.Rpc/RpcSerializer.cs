@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -29,12 +30,15 @@ namespace Warden.Rpc
 
     public class RpcSerializer
     {
+        const int PROTOBUF_INTERNAL_BUFFER_SIZE = 4096;
+        
         public Encoding Encoding { get; set; }
 
         protected Dictionary<string, MessageInfo> messageMap;
         protected Dictionary<Type, MessageInfo> messageMapReverse;
 
         protected HashSet<Assembly> assemblies;
+        protected ArrayPool<byte> arrayPool;
 
         public RpcSerializer(params Assembly[] assemblies)
             : this()
@@ -42,12 +46,18 @@ namespace Warden.Rpc
             AddAssemblyTypesToRegistry(assemblies);
         }
 
-        protected RpcSerializer()
+        public RpcSerializer(ArrayPool<byte> arrayPool)
         {
+            this.arrayPool = arrayPool;
             this.Encoding = new UTF8Encoding(false);
             this.assemblies = new HashSet<Assembly>();
             this.messageMap = new Dictionary<string, MessageInfo>();
             this.messageMapReverse = new Dictionary<Type, MessageInfo>();
+        }
+
+        public RpcSerializer() : this(ArrayPool<byte>.Shared)
+        {
+            
         }
 
         public void AddAssemblyTypesToRegistry(Assembly assembly)
@@ -126,7 +136,18 @@ namespace Warden.Rpc
             {
                 var messageInfo = messageMap[messageType];
                 using (LimitedReadStream limitedReadStream = new LimitedReadStream(reader.BaseStream, length, true))
-                    return messageInfo.Parser.ParseFrom(limitedReadStream);
+                {
+                    byte[] rentedArray = arrayPool.Rent(PROTOBUF_INTERNAL_BUFFER_SIZE);
+                    try
+                    {
+                        using(CodedInputStream cis = new CodedInputStream(limitedReadStream, rentedArray, true))
+                            return messageInfo.Parser.ParseFrom(cis);
+                    }
+                    finally
+                    {
+                        arrayPool.Return(rentedArray);
+                    }
+                }
             }
             else if (messageType.StartsWith("\0"))
             {
@@ -158,7 +179,20 @@ namespace Warden.Rpc
                 writer.Write(messageInfo.MessageType);
 
                 if (len > 0)
-                    iMessage.WriteTo(writer.BaseStream);
+                {
+                    byte[] rentedArray = arrayPool.Rent(PROTOBUF_INTERNAL_BUFFER_SIZE);
+                    try
+                    {
+                        using (CodedOutputStream cos = new CodedOutputStream(writer.BaseStream, rentedArray, true))
+                        {
+                            iMessage.WriteTo(cos);
+                        }
+                    }
+                    finally
+                    {
+                        arrayPool.Return(rentedArray);
+                    }
+                }
             }
             else if (value is ICustomMessage customMessageValue)
             {
