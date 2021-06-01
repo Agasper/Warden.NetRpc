@@ -149,15 +149,11 @@ namespace Warden.Logging
                 localMergedMeta = localMergedMeta.Merge(meta);
             }
 
-            foreach (var handler in parent.Handlers)
-            {
-                handler.Write(level, payload, localMergedMeta, this);
-            }
+            for(int i = 0; i < parent.Handlers.Count; i++)
+                parent.Handlers[i].Write(level, payload, localMergedMeta, this);
 
-            foreach (var handler in handlers)
-            {
-                handler.Write(level, payload, localMergedMeta, this);
-            }
+            for(int i = 0; i < handlers.Count; i++)
+                handlers[i].Write(level, payload, localMergedMeta, this);
         }
     }
 }

@@ -42,6 +42,8 @@ namespace Warden.Util.Pooling
             stack = new ConcurrentStack<T>();
         }
 
+        public int Count => stack.Count;
+
         public void Clear(bool dispose)
         {
             bool isDisposable = typeof(IDisposable).IsAssignableFrom(typeof(T));
