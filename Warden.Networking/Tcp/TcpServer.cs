@@ -23,7 +23,7 @@ namespace Warden.Networking.Tcp
 
         ILogger logger;
         ConcurrentDictionary<long, TcpConnection> connections;
-        IEnumerable<KeyValuePair<long, TcpConnection>> connectionsEnumerator;
+        IResettableCachedEnumerable<KeyValuePair<long, TcpConnection>> connectionsEnumerator;
         Socket serverSocket;
         new TcpConfigurationServer configuration;
         long connectionId = 0;
@@ -39,7 +39,7 @@ namespace Warden.Networking.Tcp
                 configuration.AcceptThreads / 2 + 1,
                 Math.Min(configuration.MaximumConnections, 101));
             this.connectionsEnumerator =
-                new EnumerationWrapper<KeyValuePair<long, TcpConnection>>(this.connections.GetEnumerator());
+                new ResettableCachedEnumerator<KeyValuePair<long, TcpConnection>>(this.connections);
             this.configuration = configuration;
             this.logger = configuration.LogManager.GetLogger(nameof(TcpServer));
             this.logger.Meta.Add("kind", this.GetType().Name);
@@ -73,6 +73,7 @@ namespace Warden.Networking.Tcp
 
         private protected override void PollEventsInternal()
         {
+            connectionsEnumerator.Reset();
             foreach(var pair in connectionsEnumerator)
                 pair.Value?.PollEventsInternal();
         }
