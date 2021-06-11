@@ -23,7 +23,9 @@ namespace Warden.Networking.Tcp
 
         ILogger logger;
         ConcurrentDictionary<long, TcpConnection> connections;
+#if NET50
         IResettableCachedEnumerable<KeyValuePair<long, TcpConnection>> connectionsEnumerator;
+#endif 
         Socket serverSocket;
         new TcpConfigurationServer configuration;
         long connectionId = 0;
@@ -38,8 +40,10 @@ namespace Warden.Networking.Tcp
             this.connections = new ConcurrentDictionary<long, TcpConnection>(
                 configuration.AcceptThreads / 2 + 1,
                 Math.Min(configuration.MaximumConnections, 101));
+#if NET50
             this.connectionsEnumerator =
                 new ResettableCachedEnumerator<KeyValuePair<long, TcpConnection>>(this.connections);
+#endif
             this.configuration = configuration;
             this.logger = configuration.LogManager.GetLogger(nameof(TcpServer));
             this.logger.Meta.Add("kind", this.GetType().Name);
@@ -73,9 +77,14 @@ namespace Warden.Networking.Tcp
 
         private protected override void PollEventsInternal()
         {
+#if NET50
             connectionsEnumerator.Reset();
             foreach(var pair in connectionsEnumerator)
                 pair.Value?.PollEventsInternal();
+#else
+            foreach(var pair in connections)
+                pair.Value?.PollEventsInternal();
+#endif 
         }
 
         internal override void OnConnectionClosedInternal(TcpConnection tcpConnection)
