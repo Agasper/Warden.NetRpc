@@ -69,6 +69,11 @@ namespace Warden.Util.Pooling
                 return generator();
             }
         }
+        
+        public T Pop<T>() where T : new()
+        {
+            return Pop<T>(() => new T());
+        }
 
         public ObjectHolder<T> PopWithHolder<T>(Func<T> generator)
         {
