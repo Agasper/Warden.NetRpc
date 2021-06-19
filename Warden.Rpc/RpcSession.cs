@@ -330,12 +330,16 @@ namespace Warden.Rpc
         {
             logger.Error($"Local method execution exception on {remotingRequest}: {exception}");
 
-            RemotingResponseError remotingResponseError = new RemotingResponseError(
+            if (remotingRequest.ExpectAck)
+            {
+                RemotingResponseError remotingResponseError = new RemotingResponseError(
                     remotingRequest.RequestId,
                     remotingRequest.MethodKey,
                     exception);
 
-            SendMessage(remotingResponseError, false);
+
+                SendMessage(remotingResponseError, false);
+            }
 
             try
             {
