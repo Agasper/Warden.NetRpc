@@ -73,11 +73,33 @@ namespace Warden.Networking.Tcp
         readonly byte[] recvBuffer;
         readonly byte[] sendBuffer;
         readonly ConcurrentQueue<DelayedMessage> latencySimulationRecvQueue;
+        readonly ConcurrentQueue<DelayedMessage> latencySimulationSendQueue;
 
         struct DelayedMessage //for latency simulation
         {
             public TcpRawMessage message;
             public DateTime releaseTimestamp;
+
+            TaskCompletionSource<DelayedMessage> taskCompletionSource;
+
+            public Task GetTask()
+            {
+                if (taskCompletionSource == null)
+                    taskCompletionSource = new TaskCompletionSource<DelayedMessage>();
+                return taskCompletionSource.Task;
+            }
+
+            public void Complete(Task task)
+            {
+                if (taskCompletionSource == null)
+                    return;
+                if (task.IsCanceled)
+                    taskCompletionSource.TrySetCanceled();
+                if (task.IsCompleted)
+                    taskCompletionSource.TrySetResult(this);
+                if (task.IsFaulted)
+                    taskCompletionSource.TrySetException(task.Exception ?? new Exception("Unknown exception"));
+            }
         }
 
         public TcpConnection(TcpPeer parent)
@@ -85,6 +107,7 @@ namespace Warden.Networking.Tcp
             if (parent == null)
                 throw new ArgumentNullException(nameof(parent));
             this.latencySimulationRecvQueue = new ConcurrentQueue<DelayedMessage>();
+            this.latencySimulationSendQueue = new ConcurrentQueue<DelayedMessage>();
             this.stashed = true;
             this.Statistics = new TcpConnectionStatistics();
             this.sendSemaphore = new SemaphoreSlim(1, 1);
@@ -160,6 +183,8 @@ namespace Warden.Networking.Tcp
             }
             
             while (this.latencySimulationRecvQueue.TryDequeue(out DelayedMessage removed))
+                removed.message.Dispose();
+            while (this.latencySimulationSendQueue.TryDequeue(out DelayedMessage removed))
                 removed.message.Dispose();
 
             stashed = true;
@@ -451,6 +476,22 @@ namespace Warden.Networking.Tcp
             }
 
             Statistics.PollEvents();
+            
+            while (latencySimulationSendQueue.Count > 0 && Connected)
+            {
+                if (latencySimulationSendQueue.TryPeek(out DelayedMessage msg))
+                {
+                    if (DateTime.UtcNow > msg.releaseTimestamp)
+                    {
+                        latencySimulationSendQueue.TryDequeue(out DelayedMessage _msg);
+                        SendMessageSkipSimulationAsync(msg.message).ContinueWith(msg.Complete);
+                    }
+                    else
+                        break;
+                }
+                else
+                    break;
+            }
 
             while (latencySimulationRecvQueue.Count > 0 && Connected)
             {
@@ -481,27 +522,38 @@ namespace Warden.Networking.Tcp
 
         public virtual async Task SendMessageAsync(TcpRawMessage message)
         {
+            if (Parent.Configuration.ConnectionSimulation != null)
+            {
+                int delay = Parent.Configuration.ConnectionSimulation.GetHalfDelay();
+                var delayedMessage = new DelayedMessage()
+                {
+                    message = message,
+                    releaseTimestamp = DateTime.UtcNow.AddMilliseconds(delay)
+                };
+                latencySimulationSendQueue.Enqueue(delayedMessage);
+                await delayedMessage.GetTask();
+                return;
+            }
+
+            await SendMessageSkipSimulationAsync(message);
+        }
+
+        async Task SendMessageSkipSimulationAsync(TcpRawMessage message)
+        {
             if (!Connected)
             {
                 message.Dispose();
                 throw new InvalidOperationException($"Connection is not established");
             }
-
-            if (Parent.Configuration.ConnectionSimulation != null)
-            {
-                int delay = Parent.Configuration.ConnectionSimulation.GetHalfDelay();
-                if (delay > 0)
-                    await Task.Delay(delay).ConfigureAwait(false);
-            }
-
+            
             Task newSendTask = null;
             lock (sendMutex)
             {
                 sendTask = sendTask.ContinueWith(
-                    (task, msg) =>
-                {
-                    return SendMessageInternalAsync(msg as TcpRawMessage);
-                }, message)
+                        (task, msg) =>
+                        {
+                            return SendMessageInternalAsync(msg as TcpRawMessage);
+                        }, message)
                     .Unwrap();
 
                 newSendTask = sendTask;
