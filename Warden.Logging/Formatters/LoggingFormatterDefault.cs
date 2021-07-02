@@ -6,6 +6,7 @@ namespace Warden.Logging.Formatters
 {
     public class LoggingFormatterDefault : ILoggingFormatter, IDisposable
     {
+        public string DateTimeFormat { get; set; } = "yyyy-MM-dd HH:mm:ss.fff";
         public bool IncludeLoggerNameInMessage { get; set; } = true;
         public bool IncludeTimestampInMessage { get; set; } = true;
         public bool IncludeSeverityInMessage { get; set; } = true;
@@ -32,7 +33,7 @@ namespace Warden.Logging.Formatters
             var stringBuilder = GetStringBuilder();
             stringBuilder.Clear();
             if (IncludeTimestampInMessage)
-                stringBuilder.AppendFormat("[{0}] ", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff"));
+                stringBuilder.AppendFormat("[{0}] ", DateTime.UtcNow.ToString(DateTimeFormat));
             if (IncludeLoggerNameInMessage)
                 stringBuilder.AppendFormat("[{0}] ", logger.Name);
             if (IncludeSeverityInMessage)

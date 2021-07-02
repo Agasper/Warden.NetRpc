@@ -10,12 +10,6 @@ namespace Warden.Rpc.Net.Tcp
         TcpConfigurationServer tcpConfiguration;
         int maxStashedConnections;
 
-        public override void CaptureSynchronizationContext()
-        { 
-            base.CaptureSynchronizationContext();
-            tcpConfiguration.CaptureSynchronizationContext();
-        }
-
         public RpcTcpConfigurationServer() : base()
         {
             tcpConfiguration = new TcpConfigurationServer();

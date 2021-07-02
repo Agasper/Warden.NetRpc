@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Warden.Logging;
+using Warden.Networking;
 using Warden.Networking.Cryptography;
 using Warden.Rpc.Cryptography;
 
@@ -20,6 +21,7 @@ namespace Warden.Rpc.Net
         public ISessionFactory SessionFactory { get => sessionFactory; set { CheckLocked(); CheckNull(value); sessionFactory = value; } }
         public RemotingObjectConfiguration RemotingConfiguration { get => remotingConfiguration; set { CheckLocked(); CheckNull(value); remotingConfiguration = value; } }
         public int CompressionThreshold { get => compressionThreshold; set { CheckLocked(); compressionThreshold = value; } }
+        public ContextSynchronizationMode ContextSynchronizationMode { get => contextSynchronizationMode; set { CheckLocked(); contextSynchronizationMode = value; } }
 
         ICipherFactory cipherFactory;
         ISessionFactory sessionFactory;
@@ -30,7 +32,9 @@ namespace Warden.Rpc.Net
         int compressionThreshold;
         RpcSerializer serializer;
         TaskScheduler taskScheduler;
+        SynchronizationContext synchronizationContext;
         RemotingObjectConfiguration remotingConfiguration;
+        ContextSynchronizationMode contextSynchronizationMode;
         
         protected bool locked;
 
@@ -59,6 +63,13 @@ namespace Warden.Rpc.Net
             if (SynchronizationContext.Current == null)
                 throw new NullReferenceException("Synchronization context is null");
             this.TaskScheduler = TaskScheduler.FromCurrentSynchronizationContext();
+            this.synchronizationContext = SynchronizationContext.Current;
+        }
+        
+        internal void SynchronizeSafe(Action callback, ILogger logger)
+        {
+            ContextSynchronizationHelper.SynchronizeSafe(this.synchronizationContext, this.contextSynchronizationMode,
+                callback, logger);
         }
 
         internal bool IsCipherSet => this.cipherFactory != null;
@@ -84,6 +95,7 @@ namespace Warden.Rpc.Net
             else
                 serializer = new RpcSerializer();
             remotingConfiguration = RemotingObjectConfiguration.Default;
+            synchronizationContext = new SynchronizationContext();
             logManager = Logging.LogManager.Dummy;
             defaultExecutionTimeout = 10000;
             orderedExecution = false;

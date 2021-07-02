@@ -11,15 +11,8 @@ namespace Warden.Rpc.Net.Tcp
         
         protected bool autoReconnect;
         protected int autoReconnectDelay;
-
-
+        
         TcpConfigurationClient tcpConfiguration;
-
-        public override void CaptureSynchronizationContext()
-        { 
-            base.CaptureSynchronizationContext();
-            tcpConfiguration.CaptureSynchronizationContext();
-        }
 
         public RpcTcpConfigurationClient() : base()
         {

@@ -147,24 +147,26 @@ namespace Warden.Rpc.Net.Tcp
         void OnSessionStarted(SessionOpenedEventArgs args)
         {
             this.Session = args.Session;
-            
-            try
+            this.configuration.SynchronizeSafe(() =>
             {
-                OnSessionOpened(args);
-            }
-            catch (Exception e)
-            {
-                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpened)}: {e}");
-            }
+                try
+                {
+                    OnSessionOpened(args);
+                }
+                catch (Exception e)
+                {
+                    logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpened)}: {e}");
+                }
 
-            try
-            {
-                OnSessionOpenedEvent?.Invoke(args);
-            }
-            catch (Exception e)
-            {
-                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpenedEvent)}: {e}");
-            }
+                try
+                {
+                    OnSessionOpenedEvent?.Invoke(args);
+                }
+                catch (Exception e)
+                {
+                    logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionOpenedEvent)}: {e}");
+                }
+            }, logger);
         }
 
         protected virtual Task Authenticate(SessionOpenedEventArgs args)
@@ -270,25 +272,28 @@ namespace Warden.Rpc.Net.Tcp
         
         void IRpcPeer.OnSessionClosed(SessionClosedEventArgs args)
         {
-            try
+            this.configuration.SynchronizeSafe(() =>
             {
-                OnSessionClosed(args);
-            }
-            catch (Exception e)
-            {
-                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionClosed)}: {e}");
-            }
-            
-            try
-            {
-                OnSessionClosedEvent?.Invoke(args);
-            }
-            catch (Exception e)
-            {
-                logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionClosedEvent)}: {e}");
-            }
-            
-            ChangeStatus(RpcClientStatus.Disconnected);
+                try
+                {
+                    OnSessionClosed(args);
+                }
+                catch (Exception e)
+                {
+                    logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionClosed)}: {e}");
+                }
+
+                try
+                {
+                    OnSessionClosedEvent?.Invoke(args);
+                }
+                catch (Exception e)
+                {
+                    logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnSessionClosedEvent)}: {e}");
+                }
+
+                ChangeStatus(RpcClientStatus.Disconnected);
+            }, logger);
             
             reconnectTimerStartFrom = DateTime.UtcNow;
             this.Session = null;

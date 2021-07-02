@@ -553,7 +553,7 @@ namespace Warden.Networking.Tcp
                         (task, msg) =>
                         {
                             return SendMessageInternalAsync(msg as TcpRawMessage);
-                        }, message)
+                        }, message, TaskContinuationOptions.ExecuteSynchronously)
                     .Unwrap();
 
                 newSendTask = sendTask;

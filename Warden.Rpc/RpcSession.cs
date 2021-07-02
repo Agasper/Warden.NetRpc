@@ -247,7 +247,7 @@ namespace Warden.Rpc
                     orderedExecutionTask = orderedExecutionTask.ContinueWith((t, o)
                         => ExecuteRequestInternalAsync(o as RemotingRequest), request,
                             default,
-                            TaskContinuationOptions.None,
+                            TaskContinuationOptions.ExecuteSynchronously,
                             taskScheduler ?? TaskScheduler.Default).Unwrap();
                 }
             }
