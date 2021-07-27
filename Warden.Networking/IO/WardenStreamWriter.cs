@@ -93,6 +93,11 @@ namespace Warden.Networking.IO
             this.writer.Write(value, index, count);
         }
 
+        public void Write(decimal value)
+        {
+            this.writer.Write(value);
+        }
+        
         public void WriteVarInt(int value)
         {
             VarintBitConverter.WriteVarintBytes(this, value);

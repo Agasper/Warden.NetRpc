@@ -23,6 +23,7 @@ namespace Warden.Networking.IO
         void Write(uint value);
         void Write(long value);
         void Write(ulong value);
+        void Write(decimal value);
         void Write(byte[] value);
         void Write(byte[] value, int index, int count);
 

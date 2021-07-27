@@ -1,4 +1,5 @@
 ﻿using Warden.Networking.IO;
+using Warden.Rpc.Serialization;
 
 namespace Warden.Rpc
 {

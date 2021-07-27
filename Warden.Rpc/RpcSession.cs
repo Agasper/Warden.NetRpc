@@ -7,6 +7,7 @@ using Warden.Logging;
 using Warden.Networking.IO;
 using Warden.Rpc.Events;
 using Warden.Rpc.Payload;
+using Warden.Rpc.Serialization;
 using Warden.Util;
 
 namespace Warden.Rpc
@@ -190,7 +191,7 @@ namespace Warden.Rpc
         }
 
 
-        protected internal void LogMessageReceived(ICustomMessage message)
+        protected internal void LogMessageReceived(IWardenMessage message)
         {
             this.logger.Trace($"Received {message}");
         }
@@ -437,7 +438,7 @@ namespace Warden.Rpc
             return executionTask;
         }
 
-        protected internal void SendMessage(ICustomMessage message, bool throwIfFailed)
+        protected internal void SendMessage(IWardenMessage message, bool throwIfFailed)
         {
             this.logger.Debug($"Sending {message}");
             if (!this.Connection.SendReliable(message))

@@ -1,6 +1,6 @@
 ﻿namespace Warden.Rpc.Payload
 {
-    public class RemotingPayload : ICustomMessage
+    public class RemotingPayload : IWardenMessage
     {
         public bool HasArgument { get; set; }
         public object Argument { get; set; }

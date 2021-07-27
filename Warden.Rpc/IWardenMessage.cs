@@ -1,6 +1,6 @@
 ﻿namespace Warden.Rpc
 {
-    public interface ICustomMessage
+    public interface IWardenMessage
     {
         void WriteTo(WriteFormatterInfo writeFormatterInfo);
         void MergeFrom(ReadFormatterInfo readFormatterInfo);

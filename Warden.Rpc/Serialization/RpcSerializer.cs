@@ -8,29 +8,17 @@ using Google.Protobuf;
 using Google.Protobuf.Reflection;
 using Warden.Networking.IO;
 
-namespace Warden.Rpc
+namespace Warden.Rpc.Serialization
 {
-    public class MessageInfo
-    {
-        public string MessageType { get; private set; }
-        public MessageDescriptor Descriptor { get; private set; }
-        public MessageParser Parser { get; private set; }
-
-        internal MessageInfo(MessageDescriptor messageDescriptor, MessageParser messageParser)
-        {
-            this.Descriptor = messageDescriptor;
-            this.Parser = messageParser;
-            this.MessageType = messageDescriptor.File.Package + "/" + messageDescriptor.Name;
-
-            ConstructorInfo constructorInfo = messageDescriptor.ClrType.GetConstructor(Type.EmptyTypes);
-            if (constructorInfo == null)
-                throw new ArgumentException($"Message {messageDescriptor.ClrType.Name} doesn't have public parameterless constructor");
-        }
-    }
-
     public class RpcSerializer
     {
         const int PROTOBUF_INTERNAL_BUFFER_SIZE = 4096;
+
+        public enum PayloadType : byte
+        {
+            TypeCode,
+            Protobuf
+        }
         
         public Encoding Encoding { get; set; }
 
@@ -131,16 +119,21 @@ namespace Warden.Rpc
             int length = reader.ReadVarInt32();
             if (length < 0)
                 return null;
-            string messageType = reader.ReadString();
-            if (messageMap.ContainsKey(messageType))
+
+            PayloadType payloadType = (PayloadType) reader.ReadByte();
+            if (payloadType == PayloadType.Protobuf)
             {
+                string messageType = reader.ReadString();
+                if (!messageMap.ContainsKey(messageType))
+                    throw new InvalidOperationException($"Message type {messageType} not found in the registry");
+
                 var messageInfo = messageMap[messageType];
                 using (LimitedReadStream limitedReadStream = new LimitedReadStream(reader.BaseStream, length, true))
                 {
                     byte[] rentedArray = arrayPool.Rent(PROTOBUF_INTERNAL_BUFFER_SIZE);
                     try
                     {
-                        using(CodedInputStream cis = new CodedInputStream(limitedReadStream, rentedArray, true))
+                        using (CodedInputStream cis = new CodedInputStream(limitedReadStream, rentedArray, true))
                             return messageInfo.Parser.ParseFrom(cis);
                     }
                     finally
@@ -149,12 +142,13 @@ namespace Warden.Rpc
                     }
                 }
             }
-            else if (messageType.StartsWith("\0"))
+            else if (payloadType == PayloadType.TypeCode)
             {
-                return ReadPrimitive(reader, messageType, length);
+                TypeCode typeCode = (TypeCode)reader.ReadVarInt32();
+                return ReadPrimitive(reader, typeCode, length);
             }
-
-            throw new InvalidOperationException($"Message type {messageType} not found");
+            
+            throw new InvalidOperationException($"Wrong payload type {(int)payloadType}");
         }
 
         public void WriteBinary(IWriter writer, object value)
@@ -176,6 +170,7 @@ namespace Warden.Rpc
 
                 int len = iMessage.CalculateSize();
                 writer.WriteVarInt(len);
+                writer.Write((byte)PayloadType.Protobuf);
                 writer.Write(messageInfo.MessageType);
 
                 if (len > 0)
@@ -194,7 +189,7 @@ namespace Warden.Rpc
                     }
                 }
             }
-            else if (value is ICustomMessage customMessageValue)
+            else if (value is IWardenMessage customMessageValue)
             {
                 throw new NotImplementedException();
                 
@@ -211,78 +206,92 @@ namespace Warden.Rpc
             else
                 throw new ArgumentException($"{nameof(value)} should be IMessage, ICustomMessage or primitive type, but got {value.GetType().Name}");
         }
-
+        
         public static bool IsPrimitive(Type type)
         {
-            if (type == typeof(byte) ||
-                type == typeof(sbyte) ||
-                type == typeof(bool) ||
-                type == typeof(float) ||
-                type == typeof(double) ||
-                type == typeof(short) ||
-                type == typeof(ushort) ||
-                type == typeof(int) ||
-                type == typeof(uint) ||
-                type == typeof(long) ||
-                type == typeof(ulong) ||
-                type == typeof(string) ||
-                type == typeof(DateTime) ||
-                type == typeof(TimeSpan) ||
-                type == typeof(Guid))
-                return true;
-            return false;
+            TypeCode typeCode = Type.GetTypeCode(type);
+            if (typeCode == TypeCode.Empty || 
+                typeCode == TypeCode.Object || 
+                typeCode == TypeCode.DBNull)
+                return false;
+
+            return true;
+        }
+
+        void WritePrimitiveSetup(IWriter writer, int length, TypeCode typeCode)
+        {
+            writer.WriteVarInt(length);
+            writer.Write((byte)PayloadType.TypeCode);
+            writer.WriteVarInt((int)typeCode);
         }
 
         void WritePrimitive(IWriter writer, object value)
         {
-            switch (value)
+            TypeCode typeCode = Type.GetTypeCode(value.GetType());
+            switch (typeCode)
             {
-                case bool v: writer.WriteVarInt(1); writer.Write("\0o"); writer.Write(v); break;
-                case float v: writer.WriteVarInt(4); writer.Write("\0f"); writer.Write(v); break;
-                case double v: writer.WriteVarInt(8); writer.Write("\0d"); writer.Write(v); break;
-                case byte v: writer.WriteVarInt(1); writer.Write("\0b"); writer.Write(v); break;
-                case sbyte v: writer.WriteVarInt(1); writer.Write("\0B"); writer.Write(v); break;
-                case short v: writer.WriteVarInt(2); writer.Write("\0S"); writer.Write(v); break;
-                case ushort v: writer.WriteVarInt(2); writer.Write("\0s"); writer.Write(v); break;
-                case int v: writer.WriteVarInt(4); writer.Write("\0I"); writer.Write(v); break;
-                case uint v: writer.WriteVarInt(4); writer.Write("\0i"); writer.Write(v); break;
-                case long v: writer.WriteVarInt(8); writer.Write("\0L"); writer.Write(v); break;
-                case ulong v: writer.WriteVarInt(8); writer.Write("\0l"); writer.Write(v); break;
-                case string v:
-                    {
-                        int bytesLen = this.Encoding.GetByteCount(v);
-                        writer.WriteVarInt(bytesLen);
-                        writer.Write("\0$");
-                        writer.Write(this.Encoding.GetBytes(v));
-                        break;
-                    }
-                case DateTime v: writer.WriteVarInt(8); writer.Write("\0:"); writer.Write(v.Ticks); break;
-                case TimeSpan v: writer.WriteVarInt(8); writer.Write("\0."); writer.Write(v.Ticks); break;
-                case Guid v: writer.WriteVarInt(16); writer.Write("\0g"); writer.Write(v.ToByteArray()); break;
+                case TypeCode.Boolean:
+                    WritePrimitiveSetup(writer, 1, typeCode); writer.Write((bool)value); break;
+                case TypeCode.Single:
+                    WritePrimitiveSetup(writer, 4, typeCode); writer.Write((float)value); break;
+                case TypeCode.Double: 
+                    WritePrimitiveSetup(writer, 8, typeCode); writer.Write((double)value); break;
+                case TypeCode.Byte: 
+                    WritePrimitiveSetup(writer, 1, typeCode); writer.Write((byte)value); break;
+                case TypeCode.SByte: 
+                    WritePrimitiveSetup(writer, 1, typeCode); writer.Write((sbyte)value); break;
+                case TypeCode.Int16: 
+                    WritePrimitiveSetup(writer, 2, typeCode); writer.Write((short)value); break;
+                case TypeCode.UInt16: 
+                    WritePrimitiveSetup(writer, 2, typeCode); writer.Write((ushort)value); break;
+                case TypeCode.Int32: 
+                    WritePrimitiveSetup(writer, 4, typeCode); writer.Write((int)value); break;
+                case TypeCode.UInt32: 
+                    WritePrimitiveSetup(writer, 4, typeCode); writer.Write((uint)value); break;
+                case TypeCode.Int64: 
+                    WritePrimitiveSetup(writer, 8, typeCode); writer.Write((long)value); break;
+                case TypeCode.UInt64: 
+                    WritePrimitiveSetup(writer, 8, typeCode); writer.Write((ulong)value); break;
+                case TypeCode.Decimal:
+                    WritePrimitiveSetup(writer, 16, typeCode); writer.Write((decimal)value); break;
+                case TypeCode.Char:
+                    byte[] bytes = BitConverter.GetBytes((char) value);
+                    WritePrimitiveSetup(writer, bytes.Length, typeCode); 
+                    writer.Write(bytes);
+                    break;
+                case TypeCode.String:
+                    string s = (string) value;
+                    int bytesLen = this.Encoding.GetByteCount(s);
+                    WritePrimitiveSetup(writer, bytesLen, typeCode); 
+                    writer.Write(this.Encoding.GetBytes(s)); 
+                    break;
+                case TypeCode.DateTime:
+                    WritePrimitiveSetup(writer, 8, typeCode); writer.Write(((DateTime)value).Ticks); break;
                 default: throw new ArgumentException($"Invalid primitive type `{value.GetType().FullName}`");
             }
         }
 
-        object ReadPrimitive(IReader reader, string type, int length)
+        object ReadPrimitive(IReader reader, TypeCode typeCode, int length)
         {
-            switch (type)
+            switch (typeCode)
             {
-                case "\0o": return reader.ReadBoolean();
-                case "\0f": return reader.ReadSingle();
-                case "\0d": return reader.ReadDouble();
-                case "\0b": return reader.ReadByte();
-                case "\0B": return reader.ReadSByte();
-                case "\0S": return reader.ReadInt16();
-                case "\0s": return reader.ReadUInt16();
-                case "\0I": return reader.ReadInt32();
-                case "\0i": return reader.ReadUInt32();
-                case "\0L": return reader.ReadInt64();
-                case "\0l": return reader.ReadUInt64();
-                case "\0$": return Encoding.UTF8.GetString(reader.ReadBytes(length));
-                case "\0:": return new DateTime(reader.ReadInt64());
-                case "\0.": return new TimeSpan(reader.ReadInt64());
-                case "\0g": return new Guid(reader.ReadBytes(length));
-                default: throw new ArgumentException($"Message type `{type}` not found in registry");
+                case TypeCode.Boolean: return reader.ReadBoolean();
+                case TypeCode.Single: return reader.ReadSingle();
+                case TypeCode.Double: return reader.ReadDouble();
+                case TypeCode.Byte: return reader.ReadByte();
+                case TypeCode.SByte: return reader.ReadSByte();
+                case TypeCode.Int16: return reader.ReadInt16();
+                case TypeCode.UInt16: return reader.ReadUInt16();
+                case TypeCode.Int32: return reader.ReadInt32();
+                case TypeCode.UInt32: return reader.ReadUInt32();
+                case TypeCode.Int64: return reader.ReadInt64();
+                case TypeCode.UInt64: return reader.ReadUInt64();
+                case TypeCode.String: return Encoding.UTF8.GetString(reader.ReadBytes(length));
+                case TypeCode.Char: return BitConverter.ToChar(reader.ReadBytes(length), 0);
+                case TypeCode.DateTime: return new DateTime(reader.ReadInt64());
+                case TypeCode.Decimal: return reader.ReadDecimal();
+                case TypeCode.DBNull: return null;
+                default: throw new ArgumentException($"Unsupported type code `{typeCode}`");
             }
         }
     }

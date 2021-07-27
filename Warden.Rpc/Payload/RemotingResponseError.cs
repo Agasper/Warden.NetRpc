@@ -1,6 +1,6 @@
 ﻿namespace Warden.Rpc.Payload
 {
-    public class RemotingResponseError : ICustomMessage
+    public class RemotingResponseError : IWardenMessage
     {
         public uint RequestId { get; set; }
         public object MethodKey { get; set; }

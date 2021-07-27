@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using Warden.Logging;
+using Warden.Rpc.Serialization;
 
 namespace Warden.Rpc
 {

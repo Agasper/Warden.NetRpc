@@ -116,7 +116,7 @@ namespace Warden.Rpc.Net.Tcp
             }
         }
 
-        public bool SendReliable(ICustomMessage message)
+        public bool SendReliable(IWardenMessage message)
         {
             if (!this.Connected)
                 return false;

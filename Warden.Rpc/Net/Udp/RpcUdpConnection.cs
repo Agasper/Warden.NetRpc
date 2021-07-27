@@ -104,12 +104,12 @@ namespace Warden.Rpc.Net.Udp
             }
         }
 
-        public bool SendReliable(ICustomMessage message)
+        public bool SendReliable(IWardenMessage message)
         {
             return this.SendCustom(message, DeliveryType.ReliableOrdered, 0);
         }
 
-        public virtual bool SendCustom(ICustomMessage message, DeliveryType deliveryType, int channel)
+        public virtual bool SendCustom(IWardenMessage message, DeliveryType deliveryType, int channel)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));

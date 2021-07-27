@@ -24,6 +24,7 @@ namespace Warden.Networking.IO
         uint ReadUInt32();
         long ReadInt64();
         ulong ReadUInt64();
+        decimal ReadDecimal();
 
         int ReadVarInt32();
         uint ReadVarUInt32();

@@ -15,7 +15,7 @@ namespace Warden.Rpc
                 throw new InvalidCastException($"You must use {nameof(IRpcConnectionAdvancedDelivery)} for {nameof(RpcSessionAdvancedDelivery)}");
         }
 
-        void SendMessageCustom(ICustomMessage message, DeliveryType deliveryType, int channel)
+        void SendMessageCustom(IWardenMessage message, DeliveryType deliveryType, int channel)
         {
             this.logger.Trace($"{this} sending {message}");
             if (!this.advancedDeliveryConnection.SendCustom(message, deliveryType, channel))

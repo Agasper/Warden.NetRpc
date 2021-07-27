@@ -102,6 +102,11 @@ namespace Warden.Networking.IO
             reader.Read(array, index, count);
         }
 
+        public decimal ReadDecimal()
+        {
+            return reader.ReadDecimal();
+        }
+
         public int ReadVarInt32()
         {
             return VarintBitConverter.ToInt32(this);

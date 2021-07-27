@@ -6,6 +6,7 @@ using Warden.Logging;
 using Warden.Networking;
 using Warden.Networking.Cryptography;
 using Warden.Rpc.Cryptography;
+using Warden.Rpc.Serialization;
 
 namespace Warden.Rpc.Net
 {
