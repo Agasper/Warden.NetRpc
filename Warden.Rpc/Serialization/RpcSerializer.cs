@@ -204,7 +204,7 @@ namespace Warden.Rpc.Serialization
                 WritePrimitive(writer, value);
             }
             else
-                throw new ArgumentException($"{nameof(value)} should be IMessage, ICustomMessage or primitive type, but got {value.GetType().Name}");
+                throw new ArgumentException($"{nameof(value)} should be IMessage, IWardenMessage or primitive type, but got {value.GetType().Name}");
         }
         
         public static bool IsPrimitive(Type type)
