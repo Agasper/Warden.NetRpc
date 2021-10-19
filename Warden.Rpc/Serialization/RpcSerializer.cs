@@ -12,7 +12,7 @@ namespace Warden.Rpc.Serialization
 {
     public class RpcSerializer
     {
-        const int PROTOBUF_INTERNAL_BUFFER_SIZE = 4096;
+        protected const int PROTOBUF_INTERNAL_BUFFER_SIZE = 4096;
 
         public enum PayloadType : byte
         {

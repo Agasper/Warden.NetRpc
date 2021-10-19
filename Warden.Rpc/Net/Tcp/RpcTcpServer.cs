@@ -66,7 +66,6 @@ namespace Warden.Rpc.Net.Tcp
         }
 
         public int SessionsCount => innerTcpServer.Connections.Count;
-
         public IEnumerable<RpcSession> Sessions
         {
             get

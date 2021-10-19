@@ -59,6 +59,9 @@ namespace Warden.Networking.Tcp.Messages
         {
             long prevPos = this.stream.Position;
             this.stream.Position = 0;
+
+            if (this.stream.Length < 2)
+                return false;
             
             if (this.stream.ReadByte() != 0x1F)
             {
