@@ -280,7 +280,7 @@ namespace Warden.Rpc
                 double timeSeconds = sw.ElapsedTicks / (double) Stopwatch.Frequency;
                 ulong timeSpanTicks = (ulong) (timeSeconds * TimeSpan.TicksPerSecond);
                 float ms = timeSpanTicks / (float) TimeSpan.TicksPerMillisecond;
-                logger.Debug($"Executed {request} locally in {ms.ToString("0.00")}ms");
+                logger.Info($"Executed {request} locally in {ms.ToString("0.00")}ms");
 
                 LocalExecutionCompletedEventArgs eventArgsCompleted =
                     new LocalExecutionCompletedEventArgs(executionRequest, executionResponse, ms);
@@ -464,7 +464,7 @@ namespace Warden.Rpc
                     timeout = options.Timeout;
                 await RemoteExecutionWrapper(request, options, request.WaitAsync(timeout)).ConfigureAwait(false);
                 float ms = request.Response.ExecutionTime / (float) TimeSpan.TicksPerMillisecond;
-                this.logger.Debug($"Executed {request} remotely in {ms.ToString("0.00")}ms");
+                this.logger.Info($"Executed {request} remotely in {ms.ToString("0.00")}ms");
                 OnRemoteExecutionCompleted(new RemoteExecutionCompletedEventArgs(executionRequest,
                     new ExecutionResponse(request.Response), options, ms));
             }
@@ -549,6 +549,8 @@ namespace Warden.Rpc
             RemotingRequest request = GetRequest(methodIdentity, false, !sendingOptions.NoAck);
             request.HasArgument = false;
             SendMessage(request, sendingOptions.ThrowIfFailedToSend);
+            
+            this.logger.Info($"Sent {request} remotely with no waiting");
         }
 
         public virtual void Send<T>(int methodIdentity, T arg) => SendInternal(methodIdentity, arg, SendingOptions.Default);
@@ -566,6 +568,8 @@ namespace Warden.Rpc
             request.HasArgument = true;
             request.Argument = arg;
             SendMessage(request, sendingOptions.ThrowIfFailedToSend);
+            
+            this.logger.Info($"Sent {request} remotely with no waiting");
         }
     }
 }

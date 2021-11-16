@@ -97,7 +97,7 @@ namespace Warden.Rpc.Net.Tcp
             this.tcsSessionOpened = new TaskCompletionSource<SessionOpenedEventArgs>();
             try
             {
-                logger.Trace($"Connecting to {host}:{port}");
+                logger.Debug($"Connecting to {host}:{port}");
                 ChangeStatus(RpcClientStatus.Connecting);
                 canReconnect = true;
                 await innerTcpClient.ConnectAsync(host, port);
@@ -247,7 +247,7 @@ namespace Warden.Rpc.Net.Tcp
         {
             if (Status == newStatus)
                 return;
-            logger.Debug($"Changed status from {Status} to {newStatus}");
+            logger.Info($"Changed status from {Status} to {newStatus}");
             RpcClientStatusChangedEventArgs args = new RpcClientStatusChangedEventArgs(this, Status, newStatus);
             Status = newStatus;
             
@@ -322,7 +322,7 @@ namespace Warden.Rpc.Net.Tcp
                 }
                 else
                 {
-                    logger.Debug($"Reconnecting to {innerTcpClient.LastEndpoint}...");
+                    logger.Info($"Reconnecting to {innerTcpClient.LastEndpoint}...");
                     _ = StartSessionAsync(innerTcpClient.LastEndpoint);
                 }
             }
