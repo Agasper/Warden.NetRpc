@@ -38,10 +38,12 @@ namespace Warden.Rpc
         uint lastRequestId;
         volatile int executionQueueSize;
         volatile bool closed;
+        Exception transportException;
         object requestsMutex = new object();
         
         protected RemotingObjectScheme remotingObjectScheme;
         protected object remotingObject;
+        
 
         public RpcSession(RpcSessionContext sessionContext)
         {
@@ -114,14 +116,13 @@ namespace Warden.Rpc
 
             try
             {
-                OnClose();
+                OnClose(new OnCloseEventArgs(transportException));
             }
             catch (Exception e)
             {
                 logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnClose)}: {e}");
             }
-            
-            
+
             this.remotingObject = null;
             this.remotingObjectScheme = null;
 
@@ -130,7 +131,7 @@ namespace Warden.Rpc
             return true;
         }
 
-        protected virtual void OnClose()
+        protected virtual void OnClose(OnCloseEventArgs args)
         {
             
         }
@@ -186,6 +187,7 @@ namespace Warden.Rpc
             catch (Exception outerException)
             {
                 logger.Error($"Unhandled exception on {this.GetType().Name}.{nameof(OnMessage)}(): {outerException}");
+                transportException = outerException;
                 Connection.Close();
             }
         }
