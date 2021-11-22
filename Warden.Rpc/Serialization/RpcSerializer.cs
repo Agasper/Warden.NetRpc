@@ -133,8 +133,6 @@ namespace Warden.Rpc.Serialization
                     byte[] rentedArray = arrayPool.Rent(PROTOBUF_INTERNAL_BUFFER_SIZE);
                     try
                     {
-                        if (messageType == "test/ChangeTypeTest")
-                            throw new Exception("FAIL");
                         using (CodedInputStream cis = new CodedInputStream(limitedReadStream, rentedArray, true))
                             return messageInfo.Parser.ParseFrom(cis);
                     }
