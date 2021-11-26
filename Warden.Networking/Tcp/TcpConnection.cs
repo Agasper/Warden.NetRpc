@@ -46,7 +46,6 @@ namespace Warden.Networking.Tcp
                 return socket_.Connected;
             }
         }
-
         public DateTime Started { get; private set; }
         public TcpPeer Parent { get; private set; }
         public TcpConnectionStatistics Statistics { get; private set; }
@@ -167,7 +166,7 @@ namespace Warden.Networking.Tcp
                 return;
 
             Close();
-            DestroySocket();
+            DestroySocket(null);
 
             this.awaitingMessageHeader.Reset();
             this.Statistics.Reset();
@@ -202,7 +201,7 @@ namespace Warden.Networking.Tcp
             disposed = true;
 
             Close();
-            DestroySocket();
+            DestroySocket(null);
 
             if (this.awaitingNextMessage != null)
             {
@@ -224,12 +223,16 @@ namespace Warden.Networking.Tcp
             Dispose(true);
         }
 
-        void DestroySocket()
+        void DestroySocket(int? timeout)
         {
             var socket_ = socket;
             if (socket_ != null)
             {
-                socket_.Close();
+                logger.Debug("Connection #{Id} socket destroying...");
+                if (timeout.HasValue)
+                    socket_.Close(timeout.Value);
+                else
+                    socket_.Close();
                 socket_.Dispose();
                 this.socket = null;
             }
@@ -252,10 +255,10 @@ namespace Warden.Networking.Tcp
 
         public virtual void Close()
         {
-            CloseInternal();
+            CloseInternal(null);
         }
-
-        void CloseInternal()
+        
+        void CloseInternal(int? timeout)
         {
             if (closed)
                 return;
@@ -265,6 +268,7 @@ namespace Warden.Networking.Tcp
             {
                 logger.Debug($"Connection #{Id} closing!");
                 
+                //https://docs.microsoft.com/en-gb/windows/win32/winsock/graceful-shutdown-linger-options-and-socket-closure-2
                 var socket_ = socket;
                 if (socket_ != null)
                 {
@@ -275,7 +279,7 @@ namespace Warden.Networking.Tcp
                     catch (SocketException) { }
                     finally
                     {
-                        DestroySocket();
+                        DestroySocket(timeout);
                     }
                 }
                 
@@ -447,7 +451,7 @@ namespace Warden.Networking.Tcp
 
         protected internal virtual void PollEventsInternal()
         {
-            if (Parent.Configuration.KeepAliveEnabled)
+            if (!closed && Parent.Configuration.KeepAliveEnabled)
             {
                 TimeSpan timeSinceLastKeepAlive = DateTime.UtcNow - this.lastKeepAliveSent;
 

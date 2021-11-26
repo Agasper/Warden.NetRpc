@@ -80,10 +80,12 @@ namespace Warden.Networking.Tcp
 #if NET50
             connectionsEnumerator.Reset();
             foreach(var pair in connectionsEnumerator)
-                pair.Value?.PollEventsInternal();
+                if (pair.Value.Connected)
+                    pair.Value.PollEventsInternal();
 #else
             foreach(var pair in connections)
-                pair.Value?.PollEventsInternal();
+                if (pair.Value.Connected)
+                    pair.Value.PollEventsInternal();
 #endif 
         }
 
