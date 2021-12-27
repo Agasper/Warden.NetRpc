@@ -94,10 +94,10 @@ namespace Warden.Networking.Tcp
                     return;
                 if (task.IsCanceled)
                     taskCompletionSource.TrySetCanceled();
-                if (task.IsCompleted)
-                    taskCompletionSource.TrySetResult(this);
                 if (task.IsFaulted)
                     taskCompletionSource.TrySetException(task.Exception ?? new Exception("Unknown exception"));
+                if (task.IsCompleted && !task.IsFaulted)
+                    taskCompletionSource.TrySetResult(this);
             }
         }
 
