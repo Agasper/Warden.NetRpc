@@ -6,7 +6,7 @@ namespace Warden.Logging
     public class Logger : ILogger
     {
         public LogSeverity Severity { get; set; }
-        public string Name { get; private set; }
+        public string Name { get; set; }
         public LoggingMeta Meta { get; private set; }
         public IList<ILoggingHandler> Handlers => handlers;
 

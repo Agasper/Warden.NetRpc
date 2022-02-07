@@ -153,7 +153,8 @@ namespace Warden.Networking.Tcp
         {
             try
             {
-                StartAccept();
+                if (listening)
+                    StartAccept();
 
                 logger.Debug("Accepting new connection...");
                 Socket connSocket = serverSocket.EndAccept(asyncResult);
